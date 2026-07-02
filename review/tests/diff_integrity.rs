@@ -1,11 +1,11 @@
 mod common;
 
 use am001::core::event::Event;
-use am001::core::hebb::link_map;
+use am001::core::hebb::{add_link_delta, link_map, update_links};
 use am001::core::snapshot::from_bytes;
 use am001::core::state::{AmState, Link};
 use am001::core::step::step_result;
-use am001::core::trace::{MutationRecord, MutationTarget};
+use am001::core::trace::{MutationRecord, MutationTarget, StepTrace};
 use common::{assert_event, cue_event, link_event, row, theta_default};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -63,6 +63,43 @@ fn diff_integrity_covers_contradiction_free_reuse_merge_and_sub_eps_w_decay() {
     free_reuse_and_snapshot_roundtrip_records_match_final_changes();
     merge_inbound_and_outgoing_records_match_final_changes();
     sub_eps_w_decay_is_not_applied_or_logged();
+}
+
+#[test]
+fn sub_eps_w_growth_and_saturation_are_not_applied_or_logged() {
+    let mut theta = theta_default();
+    theta.eps_log = 0.01;
+    theta.eps_w = 0.000001;
+    theta.eta_w = 1.0;
+    theta.del_w = 0.0;
+    let mut state = AmState::new(theta);
+
+    add_link_delta(&mut state, 0, 1, 0.005);
+    assert!(state.links[0].is_empty());
+
+    check_one_step(&mut state, &assert_event(1, "a", &[("truth_assert", 1.0)]));
+    check_one_step(&mut state, &assert_event(2, "b", &[("agency", 1.0)]));
+    let a = row(&state, "a");
+    let b = row(&state, "b");
+    state.links[a].clear();
+    state.links[b].clear();
+    state.links[a].push(Link {
+        target: b,
+        weight: 0.995,
+    });
+    state.links[b].push(Link {
+        target: a,
+        weight: 0.995,
+    });
+
+    let mut trace = StepTrace::new(state.tick + 1, 3);
+    update_links(&mut state, &link_event(3, "a", "b", 1.0), &[], &mut trace).unwrap();
+    assert_eq!(state.links[a][0].weight, 0.995);
+    assert_eq!(state.links[b][0].weight, 0.995);
+    assert!(trace
+        .mutations
+        .iter()
+        .all(|mutation| mutation.target != MutationTarget::W));
 }
 
 fn check_one_step(state: &mut AmState, event: &Event) {

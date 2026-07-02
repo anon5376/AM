@@ -4,3 +4,4 @@ pub mod eval;
 pub mod llm;
 pub mod parser;
 pub mod storage;
+pub mod world;

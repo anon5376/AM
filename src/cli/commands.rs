@@ -8,6 +8,9 @@ use crate::eval::sweep::{load_grid, run_sweep};
 use crate::parser::rule::parse_rule_line;
 use crate::storage::snapshot_file::{load_snapshot, save_snapshot};
 use crate::storage::trace_file::append_trace;
+use crate::world::runner::{run_episode, write_episode_files};
+use crate::world::script::parse_script_path;
+use crate::world::theta::WorldTheta;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::fs;
@@ -96,6 +99,22 @@ enum Command {
         grid: PathBuf,
         #[arg(long)]
         out: PathBuf,
+    },
+    WorldRun {
+        #[arg(long)]
+        map_seed: u64,
+        #[arg(long)]
+        rule_seed: u64,
+        #[arg(long)]
+        script: PathBuf,
+        #[arg(long)]
+        obs_out: PathBuf,
+        #[arg(long)]
+        trace_out: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        dump_every: usize,
+        #[arg(long)]
+        theta: Option<PathBuf>,
     },
 }
 
@@ -220,6 +239,29 @@ pub fn run() -> Result<()> {
             let grid = load_grid(&grid)?;
             run_sweep(&grid, &out)?;
             println!("wrote {}", out.display());
+        }
+        Command::WorldRun {
+            map_seed,
+            rule_seed,
+            script,
+            obs_out,
+            trace_out,
+            dump_every,
+            theta,
+        } => {
+            let theta = WorldTheta::load_optional(theta.as_deref())?;
+            let actions = parse_script_path(&script)?;
+            let output = run_episode(theta, map_seed, rule_seed, &actions, dump_every)?;
+            write_episode_files(&output, &obs_out, &trace_out)?;
+            for line in output.dumps {
+                println!("{line}");
+            }
+            println!(
+                "world-run actions={} obs={} trace={}",
+                actions.len(),
+                obs_out.display(),
+                trace_out.display()
+            );
         }
     }
     Ok(())

@@ -91,15 +91,35 @@ pub fn add_link_delta(state: &mut AmState, row: usize, target: usize, delta: f32
     if row == target {
         return;
     }
-    if let Some(link) = state.links[row]
-        .iter_mut()
+    let before = state.links[row]
+        .iter()
         .find(|link| link.target == target)
-    {
-        link.weight = (link.weight + delta).clamp(0.0, state.theta.w_max);
+        .map(|link| link.weight)
+        .unwrap_or(0.0);
+    let proposed = (before + delta).clamp(0.0, state.theta.w_max);
+    let after = if proposed >= state.theta.eps_w {
+        proposed
     } else {
-        let weight = delta.clamp(0.0, state.theta.w_max);
-        if weight >= state.theta.eps_w {
-            state.links[row].push(Link { target, weight });
+        0.0
+    };
+    if (after - before).abs() < state.theta.eps_log {
+        return;
+    }
+    if let Some(index) = state.links[row]
+        .iter()
+        .position(|link| link.target == target)
+    {
+        if after == 0.0 {
+            state.links[row].remove(index);
+        } else {
+            state.links[row][index].weight = after;
+        }
+    } else {
+        if after > 0.0 {
+            state.links[row].push(Link {
+                target,
+                weight: after,
+            });
         }
     }
     state.links[row].sort_by_key(|link| link.target);
