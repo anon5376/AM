@@ -45,12 +45,14 @@ impl CriterionResult {
 #[derive(Clone, Copy, Debug)]
 pub struct CriteriaConfig {
     pub completion_assemblies: usize,
+    pub measure_margin: bool,
 }
 
 impl CriteriaConfig {
     pub fn full_scale() -> Self {
         Self {
             completion_assemblies: 30,
+            measure_margin: true,
         }
     }
 }
@@ -187,8 +189,13 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
     }
 
     let trained = state.clone();
-    let mut margin_state = trained.clone();
-    scale_link_weights(&mut margin_state, 0.95);
+    let mut margin_state = if config.measure_margin {
+        let mut margin_state = trained.clone();
+        scale_link_weights(&mut margin_state, 0.95);
+        Some(margin_state)
+    } else {
+        None
+    };
     let mut recall_sum = 0.0;
     let mut foreign_sum = 0.0;
     let mut margin_recall_sum = 0.0;
@@ -230,32 +237,38 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
             foreign as f64 / active.len() as f64
         };
 
-        let mut margin_trial = margin_state.clone();
-        let _ = step_result(&mut margin_trial, &Event::empty(margin_event_id));
-        margin_event_id += 1;
-        let margin_trace = match step_result(
-            &mut margin_trial,
-            &cue_two_event(margin_event_id, &labels[0], &labels[1], 0.8),
-        ) {
-            Ok(trace) => trace,
-            Err(err) => return CriterionResult::fail("completion", err.to_string()),
-        };
-        margin_event_id += 1;
-        let margin_active = margin_trace
-            .active_set_before_decay
-            .iter()
-            .copied()
-            .collect::<BTreeSet<_>>();
-        let margin_non_cued = labels[2..]
-            .iter()
-            .filter(|label| margin_active.contains(&row(&margin_trial, label)))
-            .count();
-        margin_recall_sum += margin_non_cued as f64 / 3.0;
+        if let Some(margin_state) = &mut margin_state {
+            let mut margin_trial = margin_state.clone();
+            let _ = step_result(&mut margin_trial, &Event::empty(margin_event_id));
+            margin_event_id += 1;
+            let margin_trace = match step_result(
+                &mut margin_trial,
+                &cue_two_event(margin_event_id, &labels[0], &labels[1], 0.8),
+            ) {
+                Ok(trace) => trace,
+                Err(err) => return CriterionResult::fail("completion", err.to_string()),
+            };
+            margin_event_id += 1;
+            let margin_active = margin_trace
+                .active_set_before_decay
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>();
+            let margin_non_cued = labels[2..]
+                .iter()
+                .filter(|label| margin_active.contains(&row(&margin_trial, label)))
+                .count();
+            margin_recall_sum += margin_non_cued as f64 / 3.0;
+        }
     }
 
     let recall = recall_sum / assemblies.len() as f64;
     let contamination = foreign_sum / assemblies.len() as f64;
-    let recall_margin_095 = margin_recall_sum / assemblies.len() as f64;
+    let recall_margin_095 = if config.measure_margin {
+        Some(margin_recall_sum / assemblies.len() as f64)
+    } else {
+        None
+    };
     let passed = recall >= 0.90 && contamination < 0.05;
     let result = if passed {
         CriterionResult::pass("completion")
@@ -265,10 +278,14 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
             format!("recall={recall:.4}, contamination={contamination:.4}"),
         )
     };
-    result
+    let result = result
         .metric("recall", recall)
-        .metric("contamination", contamination)
-        .metric("recall_margin_095", recall_margin_095)
+        .metric("contamination", contamination);
+    if let Some(recall_margin_095) = recall_margin_095 {
+        result.metric("recall_margin_095", recall_margin_095)
+    } else {
+        result
+    }
 }
 
 fn scale_link_weights(state: &mut AmState, factor: f32) {

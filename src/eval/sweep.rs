@@ -27,6 +27,8 @@ pub struct SweepGrid {
     pub th_act: Option<Vec<f32>>,
     #[serde(default = "default_t")]
     pub t: usize,
+    #[serde(default = "default_measure_margin")]
+    pub measure_margin: bool,
     #[serde(default)]
     pub scale: SweepScale,
 }
@@ -37,6 +39,10 @@ fn default_t() -> usize {
 
 fn default_k_i_values() -> Vec<f32> {
     vec![Theta::default().k_i]
+}
+
+fn default_measure_margin() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,6 +84,7 @@ impl Default for SweepGrid {
             b0: None,
             th_act: None,
             t: 20,
+            measure_margin: true,
             scale: SweepScale::default(),
         }
     }
@@ -188,7 +195,7 @@ fn append_sweep_row(
     let mut failures = Vec::new();
     let mut recall = 0.0;
     let mut contamination = 0.0;
-    let mut recall_margin_095 = 0.0;
+    let mut recall_margin_095 = None;
     let mut valid = true;
     let mut all_pass = false;
 
@@ -199,6 +206,7 @@ fn append_sweep_row(
                 &theta,
                 CriteriaConfig {
                     completion_assemblies: grid.scale.completion_assemblies,
+                    measure_margin: grid.measure_margin,
                 },
             );
             for result in &results {
@@ -209,7 +217,7 @@ fn append_sweep_row(
                 if result.name == "completion" {
                     recall = *result.metrics.get("recall").unwrap_or(&0.0);
                     contamination = *result.metrics.get("contamination").unwrap_or(&0.0);
-                    recall_margin_095 = *result.metrics.get("recall_margin_095").unwrap_or(&0.0);
+                    recall_margin_095 = result.metrics.get("recall_margin_095").copied();
                 }
             }
             all_pass = results.iter().all(|result| result.passed);
@@ -225,7 +233,7 @@ fn append_sweep_row(
     }
 
     csv.push_str(&format!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},\"{}\"\n",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.6},{:.6},{},\"{}\"\n",
         theta.hash(),
         theta.n,
         grid.scale.completion_assemblies,
@@ -252,7 +260,9 @@ fn append_sweep_row(
         all_pass,
         recall,
         contamination,
-        recall_margin_095,
+        recall_margin_095
+            .map(|value| format!("{value:.6}"))
+            .unwrap_or_default(),
         failures.join(";").replace('"', "'")
     ));
 }

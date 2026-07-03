@@ -7,6 +7,7 @@
   "eta_w": [0.05, 0.15, 0.3],
   "del_w": [0.0, 0.002],
   "t": 20,
+  "measure_margin": false,
   "scale": {
     "n": 512,
     "completion_assemblies": 12

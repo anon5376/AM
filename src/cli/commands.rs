@@ -1,4 +1,4 @@
-use crate::cli::render::format_frame;
+use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
 use crate::core::event::Event;
 use crate::core::inspect::{axes_report, dump_state, format_diff};
@@ -7,6 +7,7 @@ use crate::core::step::step_result;
 use crate::core::theta::Theta;
 use crate::eval::sweep::{load_grid, run_sweep};
 use crate::parser::rule::parse_rule_line;
+use crate::percept::PerceptBridge;
 use crate::storage::snapshot_file::{load_snapshot, save_snapshot};
 use crate::storage::trace_file::append_trace;
 use crate::world::runner::{run_episode, write_episode_files};
@@ -118,6 +119,20 @@ enum Command {
         render: bool,
         #[arg(long)]
         theta: Option<PathBuf>,
+    },
+    Pipe {
+        #[arg(long)]
+        map_seed: u64,
+        #[arg(long)]
+        rule_seed: u64,
+        #[arg(long)]
+        script: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        dump_every: usize,
+        #[arg(long)]
+        theta: Option<PathBuf>,
+        #[arg(long)]
+        world_theta: Option<PathBuf>,
     },
 }
 
@@ -268,8 +283,11 @@ pub fn run() -> Result<()> {
                 println!("{line}");
             }
             if render {
-                for frame in &output.render_frames {
-                    print!("{}", format_frame(frame));
+                if let Some(first) = output.render_frames.first() {
+                    let mut glyphs = EpisodeGlyphs::from_first_frame(first);
+                    for frame in &output.render_frames {
+                        print!("{}", format_frame_with_glyphs(frame, &mut glyphs));
+                    }
                 }
             }
             println!(
@@ -279,6 +297,43 @@ pub fn run() -> Result<()> {
                 output.termination,
                 obs_out.display(),
                 trace_out.display()
+            );
+        }
+        Command::Pipe {
+            map_seed,
+            rule_seed,
+            script,
+            dump_every,
+            theta,
+            world_theta,
+        } => {
+            let world_theta = WorldTheta::load_optional(world_theta.as_deref())?;
+            let actions = parse_script_path(&script)?;
+            let output = run_episode(world_theta, map_seed, rule_seed, &actions, 0)?;
+            let mut bridge = PerceptBridge::new();
+            let mut state = AmState::new(Theta::load_optional(theta.as_deref())?)?;
+            let mut emitted = 0_usize;
+            for observation in &output.observations {
+                let events = bridge.events_for_observation(observation)?;
+                for event in events {
+                    let _ = step_result(&mut state, &event)?;
+                    emitted += 1;
+                }
+                if dump_every > 0 && (observation.tick as usize).is_multiple_of(dump_every) {
+                    println!(
+                        "pipe tick={} core_tick={} emitted_events={}",
+                        observation.tick, state.tick, emitted
+                    );
+                    print!("{}", dump_state(&state, "act", 8)?);
+                }
+            }
+            println!(
+                "pipe actions={} observations={} events={} core_tick={} termination={}",
+                actions.len(),
+                output.observations.len(),
+                emitted,
+                state.tick,
+                output.termination
             );
         }
     }

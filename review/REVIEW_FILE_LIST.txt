@@ -15,14 +15,18 @@ docs/BUILD_REPORT_S03.md
 docs/BUILD_REPORT_S04.md
 docs/BUILD_REPORT_S05.md
 docs/BUILD_REPORT_S06.md
+docs/BUILD_REPORT_S07.md
 docs/CODEX_WORKPLAN.md
 docs/CODEX_WORKPLAN_S02.md
 docs/CODEX_WORKPLAN_S03.md
 docs/CODEX_WORKPLAN_S04.md
 docs/CODEX_WORKPLAN_S05.md
 docs/CODEX_WORKPLAN_S06.md
+docs/CODEX_WORKPLAN_S07.md
 docs/OBSERVATION_SCHEMA.md
 docs/OLLAMA_SEAM.md
+docs/PERCEPT_AXIS_MAP.md
+docs/PERCEPT_SCHEMA.md
 docs/W0_WORLD.md
 src/cli/commands.rs
 src/cli/mod.rs
@@ -55,6 +59,7 @@ src/main.rs
 src/parser/mod.rs
 src/parser/ollama.rs
 src/parser/rule.rs
+src/percept/mod.rs
 src/storage/mod.rs
 src/storage/snapshot_file.rs
 src/storage/trace_file.rs
@@ -72,6 +77,7 @@ sweep/results.csv
 sweep/results_s03_check.csv
 sweep/results_s05_a15a.csv
 sweep/results_s05_full_confirm.csv
+sweep/results_s07_full_confirm.csv
 tests/cli_smoke.rs
 tests/common/mod.rs
 tests/completion.rs
@@ -84,6 +90,10 @@ tests/inspect_snapshot.rs
 tests/link_decay_alive.rs
 tests/observation_schema.rs
 tests/parser_rule.rs
+tests/percept_determinism.rs
+tests/percept_no_semantics.rs
+tests/percept_pipe_determinism.rs
+tests/percept_validity.rs
 tests/reinforcement.rs
 tests/resting_field.rs
 tests/snapshot_roundtrip.rs

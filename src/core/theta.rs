@@ -55,7 +55,7 @@ impl Default for Theta {
             lam_settle: 0.55,
             lam_v: 0.8,
             eta_m: 0.15,
-            eta_w: 0.15,
+            eta_w: 0.30,
             del_w: 0.0,
             beta: 1.4,
             gamma: 1.2,
