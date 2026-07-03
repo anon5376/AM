@@ -61,12 +61,13 @@ pub struct AmState {
 }
 
 impl AmState {
-    pub fn new(theta: Theta) -> Self {
+    pub fn new(theta: Theta) -> Result<Self> {
+        theta.validate()?;
         let n = theta.n;
         let d = theta.d;
         let mut free_list: Vec<usize> = (0..n).collect();
         free_list.reverse();
-        Self {
+        Ok(Self {
             format_version: SNAPSHOT_FORMAT_VERSION,
             theta,
             tick: 0,
@@ -85,7 +86,7 @@ impl AmState {
             open_contradictions: Vec::new(),
             recent_writes: BTreeMap::new(),
             free_list,
-        }
+        })
     }
 
     pub fn idx(&self, row: usize, axis: usize) -> usize {

@@ -7,7 +7,7 @@ use common::{assert_event, axis, row, theta_default};
 
 #[test]
 fn alternating_evidence_opens_and_same_sign_evidence_closes() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     let truth = axis("truth_assert");
 
     step_result(

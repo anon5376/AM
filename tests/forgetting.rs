@@ -7,7 +7,7 @@ use common::{assert_event, axis, row, theta_default};
 
 #[test]
 fn stale_low_baseline_rows_free_merge_and_protected_rows_survive() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     step_result(
         &mut state,
         &assert_event(1, "old", &[("truth_assert", 0.4)]),
@@ -20,7 +20,7 @@ fn stale_low_baseline_rows_free_merge_and_protected_rows_survive() {
     step_result(&mut state, &Event::empty(2)).unwrap();
     assert!(!state.is_allocated(old));
 
-    let mut merge_state = AmState::new(theta_default());
+    let mut merge_state = AmState::new(theta_default()).unwrap();
     step_result(
         &mut merge_state,
         &assert_event(1, "m1", &[("truth_assert", 1.0)]),
@@ -45,7 +45,7 @@ fn stale_low_baseline_rows_free_merge_and_protected_rows_survive() {
     assert_eq!(merge_state.aliases.get(&m1_ref), Some(&m2_ref));
     assert!(merge_state.is_allocated(m2));
 
-    let mut protected = AmState::new(theta_default());
+    let mut protected = AmState::new(theta_default()).unwrap();
     step_result(
         &mut protected,
         &assert_event(1, "goalish", &[("goal_relevance", 1.0)]),

@@ -14,16 +14,19 @@ docs/BUILD_REPORT_S02.md
 docs/BUILD_REPORT_S03.md
 docs/BUILD_REPORT_S04.md
 docs/BUILD_REPORT_S05.md
+docs/BUILD_REPORT_S06.md
 docs/CODEX_WORKPLAN.md
 docs/CODEX_WORKPLAN_S02.md
 docs/CODEX_WORKPLAN_S03.md
 docs/CODEX_WORKPLAN_S04.md
 docs/CODEX_WORKPLAN_S05.md
+docs/CODEX_WORKPLAN_S06.md
 docs/OBSERVATION_SCHEMA.md
 docs/OLLAMA_SEAM.md
 docs/W0_WORLD.md
 src/cli/commands.rs
 src/cli/mod.rs
+src/cli/render.rs
 src/cli/repl.rs
 src/core/axes.rs
 src/core/contradiction.rs
@@ -56,6 +59,7 @@ src/storage/mod.rs
 src/storage/snapshot_file.rs
 src/storage/trace_file.rs
 src/world/action.rs
+src/world/classes.rs
 src/world/grid.rs
 src/world/mod.rs
 src/world/observation.rs
@@ -77,6 +81,7 @@ tests/diff_integrity.rs
 tests/drift_check.rs
 tests/forgetting.rs
 tests/inspect_snapshot.rs
+tests/link_decay_alive.rs
 tests/observation_schema.rs
 tests/parser_rule.rs
 tests/reinforcement.rs
@@ -90,3 +95,4 @@ tests/world_cli_smoke.rs
 tests/world_determinism.rs
 tests/world_golden_trace.rs
 tests/world_semantic_quarantine.rs
+tests/world_tier_flags.rs

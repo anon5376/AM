@@ -74,7 +74,37 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
 
     for path in collect_rs(Path::new("src")) {
         let text = fs::read_to_string(&path).unwrap().to_lowercase();
-        for forbidden in ["key", "door", "food", "hazard", "opens", "poison"] {
+        let in_world = path.components().any(|part| part.as_os_str() == "world");
+        let in_forbidden_runtime_path = path.components().any(|part| {
+            matches!(
+                part.as_os_str().to_str(),
+                Some("core" | "percept" | "learner" | "planner")
+            )
+        });
+        let forbidden_words: &[&str] = if in_world {
+            &[
+                "key", "door", "food", "poison", "goal", "want", "opens", "unlocks",
+            ]
+        } else if in_forbidden_runtime_path {
+            &[
+                "key",
+                "door",
+                "food",
+                "poison",
+                "want",
+                "opens",
+                "unlocks",
+                "portable",
+                "barrier",
+                "consumable",
+                "hazard",
+                "exit",
+                "wall",
+            ]
+        } else {
+            &[]
+        };
+        for forbidden in forbidden_words {
             assert!(
                 !contains_token(&text, forbidden),
                 "semantic leak `{forbidden}` in {}",

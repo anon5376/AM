@@ -8,7 +8,7 @@ use common::{assert_event, row, theta_default};
 
 #[test]
 fn reused_row_rejects_stale_rowref_and_generation_mutations_are_logged() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     step_result(
         &mut state,
         &assert_event(1, "old", &[("truth_assert", 0.4)]),

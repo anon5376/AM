@@ -1,5 +1,5 @@
 use crate::world::action::Action;
-use crate::world::grid::{GridWorld, WorldTrace};
+use crate::world::grid::{GridWorld, TerminationCause, WorldRenderFrame, WorldTrace};
 use crate::world::observation::Observation;
 use crate::world::theta::WorldTheta;
 use anyhow::{Context, Result};
@@ -13,6 +13,8 @@ pub struct EpisodeOutput {
     pub observation_jsonl: Vec<u8>,
     pub trace_jsonl: Vec<u8>,
     pub dumps: Vec<String>,
+    pub render_frames: Vec<WorldRenderFrame>,
+    pub termination: TerminationCause,
 }
 
 pub fn run_episode(
@@ -22,24 +24,37 @@ pub fn run_episode(
     actions: &[Action],
     dump_every: usize,
 ) -> Result<EpisodeOutput> {
-    anyhow::ensure!(
-        actions.len() <= theta.step_limit,
-        "action script length {} exceeds world step_limit {}",
-        actions.len(),
-        theta.step_limit
-    );
     let mut world = GridWorld::new(theta, map_seed, rule_seed)?;
     let mut observations = Vec::new();
     let mut traces = Vec::new();
     let mut dumps = Vec::new();
+    let mut render_frames = Vec::new();
+    let mut termination = None;
 
     for action in actions {
         let (observation, trace) = world.step(*action);
         if dump_every > 0 && (observation.tick as usize).is_multiple_of(dump_every) {
             dumps.push(world.dump_line());
         }
+        render_frames.push(world.render_frame());
+        termination = trace.termination;
         observations.push(observation);
         traces.push(trace);
+        if termination.is_some() {
+            break;
+        }
+    }
+
+    let termination = termination.unwrap_or(TerminationCause::ScriptEnd);
+    if let Some(trace) = traces.last_mut() {
+        if trace.termination.is_none() {
+            trace.termination = Some(termination);
+        }
+    }
+    if let Some(frame) = render_frames.last_mut() {
+        if frame.termination.is_none() {
+            frame.termination = Some(termination);
+        }
     }
 
     let observation_jsonl = jsonl_bytes(&observations)?;
@@ -50,6 +65,8 @@ pub fn run_episode(
         observation_jsonl,
         trace_jsonl,
         dumps,
+        render_frames,
+        termination,
     })
 }
 

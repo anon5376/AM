@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 #[test]
 fn partial_cue_completes_linked_assemblies_without_foreign_spill() {
     let theta = theta_default();
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
     let mut event_id = 1;
     let mut assemblies = Vec::new();
 

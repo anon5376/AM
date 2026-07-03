@@ -20,6 +20,7 @@ fn observations_roundtrip_and_use_only_neutral_fields() {
             BTreeSet::from([
                 "blocked",
                 "energy_bucket",
+                "held_shape_id",
                 "map_seed",
                 "reward_delta",
                 "rule_seed",
@@ -33,6 +34,9 @@ fn observations_roundtrip_and_use_only_neutral_fields() {
             assert!(entity.shape_id > 0);
             assert!(entity.color_id > 0);
             assert!((1..=3).contains(&entity.size));
+        }
+        if let Some(shape) = observation.held_shape_id {
+            assert!(shape > 0);
         }
         assert_no_blacklist_words(&String::from_utf8(line.to_vec()).unwrap());
     }
@@ -50,7 +54,18 @@ fn object_keys(value: &Value) -> BTreeSet<&str> {
 fn assert_no_blacklist_words(text: &str) {
     let lower = text.to_lowercase();
     for word in [
-        "key", "door", "food", "hazard", "poison", "opens", "unlocks",
+        "key",
+        "door",
+        "food",
+        "poison",
+        "opens",
+        "unlocks",
+        "portable",
+        "barrier",
+        "consumable",
+        "hazard",
+        "exit",
+        "wall",
     ] {
         assert!(
             !lower

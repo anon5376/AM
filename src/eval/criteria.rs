@@ -73,6 +73,10 @@ pub fn run_core_criteria_with_config(
     ]
 }
 
+fn new_state(theta: &Theta, criterion: &'static str) -> Result<AmState, CriterionResult> {
+    AmState::new(theta.clone()).map_err(|err| CriterionResult::fail(criterion, err.to_string()))
+}
+
 pub fn determinism(theta: &Theta) -> CriterionResult {
     let events = vec![
         assert_event(1, "am001", &[("goal_relevance", 1.0), ("agency", 0.8)]),
@@ -82,7 +86,10 @@ pub fn determinism(theta: &Theta) -> CriterionResult {
         assert_event(5, "rust", &[("truth_assert", 1.0)]),
     ];
 
-    let mut left = AmState::new(theta.clone());
+    let mut left = match new_state(theta, "determinism") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let mut left_traces = Vec::new();
     for event in &events {
         left_traces.push(match step_result(&mut left, event) {
@@ -91,7 +98,10 @@ pub fn determinism(theta: &Theta) -> CriterionResult {
         });
     }
 
-    let mut right = AmState::new(theta.clone());
+    let mut right = match new_state(theta, "determinism") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let mut right_traces = Vec::new();
     for event in &events {
         right_traces.push(step_result(&mut right, event).expect("determinism replay"));
@@ -102,7 +112,10 @@ pub fn determinism(theta: &Theta) -> CriterionResult {
     let same_direct = state_hash == right.state_hash()
         && left_trace_hash == trace_hash(&right_traces).expect("trace hash");
 
-    let mut interrupted = AmState::new(theta.clone());
+    let mut interrupted = match new_state(theta, "determinism") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let mut interrupted_traces = Vec::new();
     for event in &events[..3] {
         interrupted_traces.push(step_result(&mut interrupted, event).expect("midway step"));
@@ -130,7 +143,10 @@ pub fn completion(theta: &Theta) -> CriterionResult {
 }
 
 pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> CriterionResult {
-    let mut state = AmState::new(theta.clone());
+    let mut state = match new_state(theta, "completion") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let mut event_id = 1;
     let mut assemblies = Vec::new();
 
@@ -171,8 +187,12 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
     }
 
     let trained = state.clone();
+    let mut margin_state = trained.clone();
+    scale_link_weights(&mut margin_state, 0.95);
     let mut recall_sum = 0.0;
     let mut foreign_sum = 0.0;
+    let mut margin_recall_sum = 0.0;
+    let mut margin_event_id = 1_000_000_i64;
 
     for labels in &assemblies {
         let mut trial = trained.clone();
@@ -209,10 +229,33 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
         } else {
             foreign as f64 / active.len() as f64
         };
+
+        let mut margin_trial = margin_state.clone();
+        let _ = step_result(&mut margin_trial, &Event::empty(margin_event_id));
+        margin_event_id += 1;
+        let margin_trace = match step_result(
+            &mut margin_trial,
+            &cue_two_event(margin_event_id, &labels[0], &labels[1], 0.8),
+        ) {
+            Ok(trace) => trace,
+            Err(err) => return CriterionResult::fail("completion", err.to_string()),
+        };
+        margin_event_id += 1;
+        let margin_active = margin_trace
+            .active_set_before_decay
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let margin_non_cued = labels[2..]
+            .iter()
+            .filter(|label| margin_active.contains(&row(&margin_trial, label)))
+            .count();
+        margin_recall_sum += margin_non_cued as f64 / 3.0;
     }
 
     let recall = recall_sum / assemblies.len() as f64;
     let contamination = foreign_sum / assemblies.len() as f64;
+    let recall_margin_095 = margin_recall_sum / assemblies.len() as f64;
     let passed = recall >= 0.90 && contamination < 0.05;
     let result = if passed {
         CriterionResult::pass("completion")
@@ -225,10 +268,22 @@ pub fn completion_with_config(theta: &Theta, config: CriteriaConfig) -> Criterio
     result
         .metric("recall", recall)
         .metric("contamination", contamination)
+        .metric("recall_margin_095", recall_margin_095)
+}
+
+fn scale_link_weights(state: &mut AmState, factor: f32) {
+    for links in &mut state.links {
+        for link in links {
+            link.weight *= factor;
+        }
+    }
 }
 
 pub fn reinforcement(theta: &Theta) -> CriterionResult {
-    let mut state = AmState::new(theta.clone());
+    let mut state = match new_state(theta, "reinforcement") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let truth = axis("truth_assert");
     let mut last_m = f32::NEG_INFINITY;
     let mut last_b = f32::NEG_INFINITY;
@@ -274,7 +329,10 @@ pub fn reinforcement(theta: &Theta) -> CriterionResult {
 }
 
 pub fn contradiction(theta: &Theta) -> CriterionResult {
-    let mut state = AmState::new(theta.clone());
+    let mut state = match new_state(theta, "contradiction") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let truth = axis("truth_assert");
 
     for (id, value) in [(1, 1.0), (2, -1.0), (3, 1.0)] {
@@ -328,7 +386,10 @@ pub fn contradiction(theta: &Theta) -> CriterionResult {
 }
 
 pub fn forgetting(theta: &Theta) -> CriterionResult {
-    let mut state = AmState::new(theta.clone());
+    let mut state = match new_state(theta, "forgetting") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let _ = step_result(
         &mut state,
         &assert_event(1, "old", &[("truth_assert", 0.4)]),
@@ -342,7 +403,10 @@ pub fn forgetting(theta: &Theta) -> CriterionResult {
         return CriterionResult::fail("forgetting", "stale low-b row was not freed");
     }
 
-    let mut merge_state = AmState::new(theta.clone());
+    let mut merge_state = match new_state(theta, "forgetting") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let _ = step_result(
         &mut merge_state,
         &assert_event(1, "m1", &[("truth_assert", 1.0)]),
@@ -366,7 +430,10 @@ pub fn forgetting(theta: &Theta) -> CriterionResult {
         return CriterionResult::fail("forgetting", "similar stale rows did not merge");
     }
 
-    let mut protected = AmState::new(theta.clone());
+    let mut protected = match new_state(theta, "forgetting") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let _ = step_result(
         &mut protected,
         &assert_event(1, "goalish", &[("goal_relevance", 1.0)]),
@@ -407,7 +474,10 @@ pub fn forgetting(theta: &Theta) -> CriterionResult {
 }
 
 pub fn diff_integrity(theta: &Theta) -> CriterionResult {
-    let mut state = AmState::new(theta.clone());
+    let mut state = match new_state(theta, "diff_integrity") {
+        Ok(state) => state,
+        Err(result) => return result,
+    };
     let mut events = Vec::new();
     for idx in 0..20 {
         events.push(assert_event(

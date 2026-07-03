@@ -17,13 +17,13 @@ fn fixed_stream_and_midway_snapshot_are_deterministic() {
         assert_event(5, "rust", &[("truth_assert", 1.0)]),
     ];
 
-    let mut left = AmState::new(theta.clone());
+    let mut left = AmState::new(theta.clone()).unwrap();
     let mut left_traces = Vec::new();
     for event in &events {
         left_traces.push(step_result(&mut left, event).unwrap());
     }
 
-    let mut right = AmState::new(theta.clone());
+    let mut right = AmState::new(theta.clone()).unwrap();
     let mut right_traces = Vec::new();
     for event in &events {
         right_traces.push(step_result(&mut right, event).unwrap());
@@ -35,7 +35,7 @@ fn fixed_stream_and_midway_snapshot_are_deterministic() {
         trace_hash(&right_traces).unwrap()
     );
 
-    let mut interrupted = AmState::new(theta);
+    let mut interrupted = AmState::new(theta).unwrap();
     let mut interrupted_traces = Vec::new();
     for event in &events[..3] {
         interrupted_traces.push(step_result(&mut interrupted, event).unwrap());

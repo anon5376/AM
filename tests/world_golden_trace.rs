@@ -13,11 +13,11 @@ fn fixed_script_matches_golden_world_hashes() {
     println!("world_golden_trace_hash={trace_hash}");
     assert_eq!(
         obs_hash,
-        "c0129c72e355a41f1b74ae2cadb07c8a82606d454c71011a640aadf417bc6229"
+        "6998ec720a46695ef15521e2b0effe24e7da817f8d3de0ba459682af4b0d2be2"
     );
     assert_eq!(
         trace_hash,
-        "4f3b634b3ebd56231098d6fd0700a5a9e840b20a286579ff05bd9b46d162c699"
+        "83790d725e130218eaffa82b2421109aeed3200a424992119187d624b061effc"
     );
 }
 

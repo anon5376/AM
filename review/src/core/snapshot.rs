@@ -31,5 +31,6 @@ pub fn from_bytes(bytes: &[u8]) -> Result<AmState> {
         wire.state.format_version,
         SNAPSHOT_FORMAT_VERSION
     );
+    wire.state.theta.validate()?;
     Ok(wire.state)
 }

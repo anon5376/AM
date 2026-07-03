@@ -94,7 +94,7 @@ pub fn run_sweep(grid: &SweepGrid, out: &Path) -> Result<SweepSummary> {
     }
     let mut summary = SweepSummary::default();
     let mut csv = String::new();
-    csv.push_str("theta_hash,n,completion_assemblies,valid,lam_settle,beta,gamma,th0,k_i,eta_w,del_w,th_write,rho_b,a_init,b0,th_act,t,determinism,completion,reinforcement,contradiction,forgetting,diff_integrity,all_pass,completion_recall,completion_contamination,failures\n");
+    csv.push_str("theta_hash,n,completion_assemblies,valid,lam_settle,beta,gamma,th0,k_i,eta_w,del_w,th_write,rho_b,a_init,b0,th_act,t,determinism,completion,reinforcement,contradiction,forgetting,diff_integrity,all_pass,completion_recall,completion_contamination,recall_margin_095,failures\n");
 
     let base = Theta::default();
     let th_write_values = values_or_default(&grid.th_write, base.th_write);
@@ -188,6 +188,7 @@ fn append_sweep_row(
     let mut failures = Vec::new();
     let mut recall = 0.0;
     let mut contamination = 0.0;
+    let mut recall_margin_095 = 0.0;
     let mut valid = true;
     let mut all_pass = false;
 
@@ -208,6 +209,7 @@ fn append_sweep_row(
                 if result.name == "completion" {
                     recall = *result.metrics.get("recall").unwrap_or(&0.0);
                     contamination = *result.metrics.get("contamination").unwrap_or(&0.0);
+                    recall_margin_095 = *result.metrics.get("recall_margin_095").unwrap_or(&0.0);
                 }
             }
             all_pass = results.iter().all(|result| result.passed);
@@ -223,7 +225,7 @@ fn append_sweep_row(
     }
 
     csv.push_str(&format!(
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.6},{:.6},\"{}\"\n",
+        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},\"{}\"\n",
         theta.hash(),
         theta.n,
         grid.scale.completion_assemblies,
@@ -250,6 +252,7 @@ fn append_sweep_row(
         all_pass,
         recall,
         contamination,
+        recall_margin_095,
         failures.join(";").replace('"', "'")
     ));
 }

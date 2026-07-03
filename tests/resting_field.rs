@@ -12,7 +12,7 @@ fn empty_ticks_drive_allocated_field_quiet_under_a15c() {
         eta_w: 0.0,
         ..Theta::default()
     };
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     for idx in 0..40 {
         step_result(

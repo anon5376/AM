@@ -13,7 +13,7 @@ fn freed_row_reuse_cannot_inherit_stale_w_edges() {
     let mut theta = theta_default();
     theta.del_w = 0.0;
     theta.th_merge = 2.0;
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     step_result(&mut state, &assert_event(1, "a", &[("truth_assert", 0.8)])).unwrap();
     step_result(&mut state, &assert_event(2, "b", &[("agency", 0.8)])).unwrap();

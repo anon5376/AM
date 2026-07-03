@@ -6,7 +6,7 @@ use common::{assert_event, axis, row, theta_default};
 
 #[test]
 fn repeated_fact_reinforces_one_row_without_duplicates() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     let truth = axis("truth_assert");
     let mut last_m = f32::NEG_INFINITY;
     let mut last_b = f32::NEG_INFINITY;

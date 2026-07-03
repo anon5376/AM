@@ -23,7 +23,7 @@ enum Cell {
 
 #[test]
 fn every_changed_scalar_and_link_has_exactly_one_trace_record() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     let mut events = Vec::new();
     for idx in 0..20 {
         events.push(assert_event(
@@ -72,7 +72,7 @@ fn sub_eps_w_growth_and_saturation_are_not_applied_or_logged() {
     theta.eps_w = 0.000001;
     theta.eta_w = 1.0;
     theta.del_w = 0.0;
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     add_link_delta(&mut state, 0, 1, 0.005);
     assert!(state.links[0].is_empty());
@@ -194,7 +194,7 @@ fn record_cells(records: &[MutationRecord]) -> BTreeMap<Cell, usize> {
 }
 
 fn contradiction_open_and_close_records_match_final_changes() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     for id in 1..=4 {
         let value = if id % 2 == 1 { 1.0 } else { -1.0 };
         check_one_step(
@@ -222,7 +222,7 @@ fn free_reuse_and_snapshot_roundtrip_records_match_final_changes() {
     let mut theta = theta_default();
     theta.th_merge = 2.0;
     theta.del_w = 0.0;
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     check_one_step(&mut state, &assert_event(1, "a", &[("truth_assert", 1.0)]));
     check_one_step(&mut state, &assert_event(2, "b", &[("agency", 1.0)]));
@@ -264,7 +264,7 @@ fn merge_inbound_and_outgoing_records_match_final_changes() {
     let mut theta = theta_default();
     theta.del_w = 0.0;
     theta.th_merge = 0.90;
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     check_one_step(&mut state, &assert_event(1, "m1", &[("truth_assert", 0.9)]));
     check_one_step(&mut state, &assert_event(2, "m2", &[("truth_assert", 0.9)]));
@@ -304,7 +304,7 @@ fn sub_eps_w_decay_is_not_applied_or_logged() {
     theta.eps_w = 0.000001;
     theta.del_w = 0.001;
     theta.a_old = 1_000_000;
-    let mut state = AmState::new(theta);
+    let mut state = AmState::new(theta).unwrap();
 
     check_one_step(&mut state, &assert_event(1, "a", &[("truth_assert", 1.0)]));
     check_one_step(&mut state, &assert_event(2, "b", &[("agency", 1.0)]));

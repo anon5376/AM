@@ -8,7 +8,7 @@ use common::{assert_event, theta_default};
 
 #[test]
 fn snapshot_version_mismatch_is_refused_clearly() {
-    let state = AmState::new(theta_default());
+    let state = AmState::new(theta_default()).unwrap();
     let mut bytes = state.snapshot_bytes();
     bytes[0] = 1;
     let err = from_bytes(&bytes).unwrap_err();
@@ -16,8 +16,17 @@ fn snapshot_version_mismatch_is_refused_clearly() {
 }
 
 #[test]
+fn snapshot_theta_violating_a15c_is_refused_clearly() {
+    let mut state = AmState::new(theta_default()).unwrap();
+    state.theta.th0 = 0.0;
+    let bytes = state.snapshot_bytes();
+    let err = from_bytes(&bytes).unwrap_err();
+    assert!(err.to_string().contains("A15c resting-field invariant"));
+}
+
+#[test]
 fn dump_shows_min_axis_certainty_and_axes_lists_all_axes() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     step_result(
         &mut state,
         &assert_event(1, "rust", &[("truth_assert", 1.0)]),

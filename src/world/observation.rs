@@ -30,5 +30,6 @@ pub struct Observation {
     pub energy_bucket: i32,
     pub reward_delta: i32,
     pub blocked: bool,
+    pub held_shape_id: Option<u32>,
     pub visible_entities: Vec<VisibleEntity>,
 }

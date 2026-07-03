@@ -7,7 +7,7 @@ use common::{assert_event, link_event, theta_default};
 
 #[test]
 fn snapshot_roundtrip_is_byte_exact() {
-    let mut state = AmState::new(theta_default());
+    let mut state = AmState::new(theta_default()).unwrap();
     step_result(&mut state, &assert_event(1, "am001", &[("agency", 0.8)])).unwrap();
     step_result(
         &mut state,

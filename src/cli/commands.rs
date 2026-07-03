@@ -1,3 +1,4 @@
+use crate::cli::render::format_frame;
 use crate::cli::repl::run_repl;
 use crate::core::event::Event;
 use crate::core::inspect::{axes_report, dump_state, format_diff};
@@ -114,6 +115,8 @@ enum Command {
         #[arg(long, default_value_t = 0)]
         dump_every: usize,
         #[arg(long)]
+        render: bool,
+        #[arg(long)]
         theta: Option<PathBuf>,
     },
 }
@@ -122,7 +125,7 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Init { snapshot, theta } => {
-            let state = AmState::new(Theta::load_optional(theta.as_deref())?);
+            let state = AmState::new(Theta::load_optional(theta.as_deref())?)?;
             save_snapshot(snapshot, &state)?;
         }
         Command::Dump {
@@ -254,6 +257,7 @@ pub fn run() -> Result<()> {
             obs_out,
             trace_out,
             dump_every,
+            render,
             theta,
         } => {
             let theta = WorldTheta::load_optional(theta.as_deref())?;
@@ -263,9 +267,16 @@ pub fn run() -> Result<()> {
             for line in output.dumps {
                 println!("{line}");
             }
+            if render {
+                for frame in &output.render_frames {
+                    print!("{}", format_frame(frame));
+                }
+            }
             println!(
-                "world-run actions={} obs={} trace={}",
+                "world-run actions={} ran={} termination={} obs={} trace={}",
                 actions.len(),
+                output.traces.len(),
+                output.termination,
                 obs_out.display(),
                 trace_out.display()
             );
@@ -278,7 +289,7 @@ fn load_or_new(path: &Path, theta_path: Option<&Path>) -> Result<AmState> {
     if path.exists() {
         load_snapshot(path)
     } else {
-        Ok(AmState::new(Theta::load_optional(theta_path)?))
+        AmState::new(Theta::load_optional(theta_path)?)
     }
 }
 
