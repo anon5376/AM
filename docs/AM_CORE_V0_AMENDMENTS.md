@@ -29,3 +29,6 @@
 
 **A14 — Contradiction lifetime.** No timeout in v0: absent resolving evidence, a contradiction stays open and `b` stays boosted indefinitely. Note it in the report as designed behavior.
 
+A15a — Sustained cue input. Each step, build an external input vector I from the event: I_i = k_i · s_i where s_i = max cue strength for cued rows, a_init for asserted rows, else 0. I is held constant across ALL settle iterations of that step and cleared afterward (never persists across ticks): a_i ← clamp(lam_settle·a_i + beta·sigmoid(net_i + I_i − th0), 0, 1). New Theta field k_i: f32 (grid below). Logging unchanged (A3 net-per-row).
+A15b — Write-gate fallback (implement only if the A15a re-sweep still yields 0 all-pass): P3 gate becomes max(a_pre_settle_i, a_i) ≥ th_write, where a_pre_settle is captured after P1.
+A15c — Resting-field invariant (mandatory regardless): Theta::validate() rejects any theta where beta·sigmoid(−th0)/(1 − lam_settle) ≥ th_act. New integration test resting_field.rs: allocate 40 rows with mixed b, run 30 empty ticks, assert max resting activation < th_act and zero rows in every k-WTA active set. This pins the disease so it cannot regress.

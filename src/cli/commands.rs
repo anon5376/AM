@@ -237,8 +237,15 @@ pub fn run() -> Result<()> {
         }
         Command::Sweep { grid, out } => {
             let grid = load_grid(&grid)?;
-            run_sweep(&grid, &out)?;
-            println!("wrote {}", out.display());
+            let summary = run_sweep(&grid, &out)?;
+            println!(
+                "wrote {} total_points={} invalid_points={} evaluated_points={} all_pass_points={}",
+                out.display(),
+                summary.total_points,
+                summary.invalid_points,
+                summary.evaluated_points,
+                summary.all_pass_points
+            );
         }
         Command::WorldRun {
             map_seed,
