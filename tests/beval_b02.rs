@@ -176,16 +176,32 @@ fn apply_rejection_exit_prints_one_clean_error_line() {
 "#,
     )
     .unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_am"))
-        .args([
-            "apply",
-            "--snapshot",
-            snapshot.to_str().unwrap(),
-            "--events",
-            events.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
+    assert_clean_apply_rejection(&snapshot, &events, None);
+    assert_clean_apply_rejection(&snapshot, &events, Some("1"));
+}
+
+fn assert_clean_apply_rejection(
+    snapshot: &std::path::Path,
+    events: &std::path::Path,
+    rust_backtrace: Option<&str>,
+) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_am"));
+    command.args([
+        "apply",
+        "--snapshot",
+        snapshot.to_str().unwrap(),
+        "--events",
+        events.to_str().unwrap(),
+    ]);
+    match rust_backtrace {
+        Some(value) => {
+            command.env("RUST_BACKTRACE", value);
+        }
+        None => {
+            command.env_remove("RUST_BACKTRACE");
+        }
+    }
+    let output = command.output().unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
     let lines = stderr.lines().collect::<Vec<_>>();

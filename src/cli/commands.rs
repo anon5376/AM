@@ -232,7 +232,7 @@ pub fn run() -> Result<()> {
                 Err(rejection) => {
                     let report_doc = header_rejection_report(rejection);
                     emit_apply_report(report.as_deref(), &report_doc)?;
-                    anyhow::bail!("EG-1 file rejected before apply");
+                    exit_apply_rejection("EG-1 file rejected before apply");
                 }
             };
             if parsed.has_structural_rejection() {
@@ -241,7 +241,7 @@ pub fn run() -> Result<()> {
                     parsed.structural_rejections,
                 );
                 emit_apply_report(report.as_deref(), &report_doc)?;
-                anyhow::bail!("EG-1 file has structural rejection");
+                exit_apply_rejection("EG-1 file has structural rejection");
             }
 
             let staging_path = staging_path_for(&snapshot);
@@ -256,7 +256,7 @@ pub fn run() -> Result<()> {
             write_trace_file(&trace_path, &outcome.traces)?;
             emit_apply_report(report.as_deref(), &outcome.report)?;
             if outcome.report.has_rejections() {
-                anyhow::bail!("EG-1 apply completed with rejected events");
+                exit_apply_rejection("EG-1 apply completed with rejected events");
             }
         }
         Command::Beval {
@@ -463,4 +463,9 @@ fn emit_apply_report(path: Option<&Path>, report: &ApplyReport) -> Result<()> {
         );
         Ok(())
     }
+}
+
+fn exit_apply_rejection(message: &str) -> ! {
+    eprintln!("Error: {message}");
+    std::process::exit(1);
 }
