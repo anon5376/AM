@@ -1,0 +1,17 @@
+{
+  "id": "grounded_apply_rejection",
+  "category": "test_grounded",
+  "question": "What clean nonzero apply outcome appears in the B01 demo when a rejected event exists?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "Error: EG-1 apply completed with rejected events",
+          "APPLY_EXIT=1"
+        ]
+      }
+    ]
+  },
+  "source_ref": "docs/BUILD_REPORT_B01.md:105-115"
+}

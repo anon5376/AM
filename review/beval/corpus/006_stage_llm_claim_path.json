@@ -1,0 +1,14 @@
+{
+  "id": "stage_llm_claim_path",
+  "category": "stage_accuracy",
+  "question": "In B01, do llm_claim events directly mutate AM state?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "exact",
+        "value": "No; llm_claim events stage and never directly touch state."
+      }
+    ]
+  },
+  "source_ref": "docs/AM_TRACK_B_ROADMAP.md:12"
+}

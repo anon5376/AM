@@ -1,0 +1,1 @@
+ANSWER: stale; current default is del_w=0.0.

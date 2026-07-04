@@ -1,0 +1,1 @@
+ANSWER: stale; current completion passes at t=20.

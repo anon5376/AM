@@ -1,0 +1,17 @@
+{
+  "id": "grounded_grammar_doc",
+  "category": "test_grounded",
+  "question": "Which committed artifact defines EG-1 for reviewers?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "docs/EVENT_GRAMMAR.md",
+          "EG-1"
+        ]
+      }
+    ]
+  },
+  "source_ref": "docs/BUILD_REPORT_B01.md:93-101"
+}

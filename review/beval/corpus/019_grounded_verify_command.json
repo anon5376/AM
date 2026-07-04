@@ -1,0 +1,19 @@
+{
+  "id": "grounded_verify_command",
+  "category": "test_grounded",
+  "question": "Recommend the verification gate for B01-derived work and cite the result.",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "cargo fmt",
+          "cargo clippy -- -D warnings",
+          "cargo test",
+          "51 tests passed"
+        ]
+      }
+    ]
+  },
+  "source_ref": "docs/BUILD_REPORT_B01.md:28-32"
+}

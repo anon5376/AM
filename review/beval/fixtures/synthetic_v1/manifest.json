@@ -1,0 +1,5 @@
+{
+  "version": "synthetic_v1",
+  "synthetic": true,
+  "fixture_format": "sha256-prompt-v1"
+}

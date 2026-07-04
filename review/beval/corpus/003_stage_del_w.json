@@ -1,0 +1,14 @@
+{
+  "id": "stage_del_w",
+  "category": "stage_accuracy",
+  "question": "What is the committed default del_w after A16?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "exact",
+        "value": "del_w=0.0"
+      }
+    ]
+  },
+  "source_ref": "docs/AM_CORE_V0_AMENDMENTS.md:36"
+}

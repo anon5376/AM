@@ -1,0 +1,1 @@
+ANSWER: No; llm_claim events stage and never directly touch state.
