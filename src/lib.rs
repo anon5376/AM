@@ -3,6 +3,7 @@ pub mod beval;
 pub mod cli;
 pub mod core;
 pub mod eval;
+pub mod ingest;
 pub mod llm;
 pub mod parser;
 pub mod percept;

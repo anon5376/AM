@@ -140,3 +140,82 @@ $ shasum -a 256 tests/golden/b03_context_1200.txt tests/golden/b03_context_400.t
 ### Next
 
 B04 ingest/distill.
+
+## B04 — Ingest and Distill Writeback
+
+### Workstream
+
+- Added `src/ingest/mod.rs`.
+- Added `am ingest --kind cargo-test|sweep-csv|world-run --input <f> --session <id> --events-out <f.jsonl>`.
+- Added `am distill --input <llm_output.txt> --session <id> --events-out <f.jsonl>`.
+- Ingest outputs `test_verified` EG-1 events only, using opaque concept labels and compact metric axes.
+- Distill extracts exactly one fenced `eg1` JSONL block without a header, forces `session_id` and `source=llm_claim`, rejects non-opaque labels, validates the generated EG-1 through the existing B01 parser, and writes nothing on rejection.
+- Added end-to-end coverage proving a distilled `llm_claim` assertion stages first and commits only after a `test_verified` cargo-test ingest event corroborates the same concept/axis sign.
+
+### Commands
+
+```text
+$ cargo test --test ingest_b04 -- --nocapture
+running 3 tests
+test ingest_all_kinds_emit_valid_test_verified_events ... ok
+test distill_extracts_one_fence_forces_source_and_rejects_bad_inputs ... ok
+test distilled_claim_stages_and_ingested_test_verified_event_commits_it ... ok
+test result: ok. 3 passed; 0 failed
+```
+
+```text
+$ cargo fmt && cargo clippy -- -D warnings && cargo test
+74 tests passed; 0 failed
+```
+
+### Demo
+
+```text
+$ am distill --input <llm.txt> --session s_demo --events-out <claim.jsonl>
+distill events_out=<claim.jsonl> bytes=159
+
+$ am ingest --kind cargo-test --input <cargo.txt> --session s_demo --events-out <verified.jsonl>
+ingest kind=cargo-test events_out=<verified.jsonl> bytes=237
+```
+
+Distilled claim:
+
+```json
+{"grammar":"EG-1"}
+{"args":{"axes":[{"axis":"truth_assert","value":1.0}],"concept":"cpt_1"},"id":1,"session_id":"s_demo","source":"llm_claim","verb":"assert"}
+```
+
+Verified ingest:
+
+```json
+{"grammar":"EG-1"}
+{"args":{"axes":[{"axis":"truth_assert","value":1.0},{"axis":"completion","value":1.0},{"axis":"confidence_proxy","value":1.0}],"concept":"cpt_1"},"id":1,"session_id":"s_demo","source":"test_verified","verb":"assert"}
+```
+
+Apply summaries:
+
+```json
+{"summary":{"applied":0,"staged":1,"rejected":0,"committed_from_staging":0,"expired":0,"structural_rejections":0},"events":[{"id":1,"action":"staged","source":"llm_claim"}]}
+{"summary":{"applied":1,"staged":0,"rejected":0,"committed_from_staging":1,"expired":0,"structural_rejections":0},"events":[{"id":1,"action":"applied","source":"test_verified"},{"id":1,"action":"committed_from_staging","source":"llm_claim","committed_by":1}]}
+```
+
+### Files Changed
+
+- `src/ingest/mod.rs`
+- `src/lib.rs`
+- `src/cli/commands.rs`
+- `tests/ingest_b04.rs`
+- `docs/BUILD_REPORT_NIGHT2.md`
+
+### Deviations
+
+- Cargo-test, sweep, and world-run parsers intentionally emit compact verification summaries, not raw artifact text or test names. This preserves the Track B no-raw-text boundary.
+- The sweep parser handles the project sweep CSV shape without adding a CSV dependency; quoted CSV fields are not supported because current sweep artifacts do not require them.
+
+### Known Limitations
+
+- Distill validates and stages proposed EG-1 events; it does not infer events from arbitrary prose.
+
+### Next
+
+B05 static dashboard.

@@ -12,6 +12,7 @@ use crate::core::state::AmState;
 use crate::core::step::step_result;
 use crate::core::theta::Theta;
 use crate::eval::sweep::{load_grid, run_sweep};
+use crate::ingest::{distill_file, ingest_file, IngestKind};
 use crate::parser::rule::parse_rule_line;
 use crate::percept::PerceptBridge;
 use crate::storage::snapshot_file::{load_snapshot, save_snapshot};
@@ -111,6 +112,24 @@ enum Command {
         budget: usize,
         #[arg(long)]
         out: PathBuf,
+    },
+    Ingest {
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        session: String,
+        #[arg(long = "events-out")]
+        events_out: PathBuf,
+    },
+    Distill {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        session: String,
+        #[arg(long = "events-out")]
+        events_out: PathBuf,
     },
     Run {
         #[arg(long)]
@@ -314,6 +333,36 @@ pub fn run() -> Result<()> {
                 crate::beval::prompt::token_count(&context)
             );
         }
+        Command::Ingest {
+            kind,
+            input,
+            session,
+            events_out,
+        } => match ingest_file(IngestKind::parse(&kind)?, input, &session, &events_out) {
+            Ok(events) => {
+                println!(
+                    "ingest kind={} events_out={} bytes={}",
+                    kind,
+                    events_out.display(),
+                    events.len()
+                );
+            }
+            Err(err) => exit_apply_rejection(&format!("ingest rejected: {err}")),
+        },
+        Command::Distill {
+            input,
+            session,
+            events_out,
+        } => match distill_file(input, &session, &events_out) {
+            Ok(events) => {
+                println!(
+                    "distill events_out={} bytes={}",
+                    events_out.display(),
+                    events.len()
+                );
+            }
+            Err(err) => exit_apply_rejection(&format!("distill rejected: {err}")),
+        },
         Command::Run {
             snapshot,
             events,
