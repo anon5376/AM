@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AM001 Development Ledger</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="rail" aria-label="Development stages">
+        <div class="mark">
+          <span>AM001</span>
+          <span id="build-id">LOCAL</span>
+        </div>
+        <nav class="page-nav" aria-label="Pages">
+          <a aria-current="page" href="/">Development</a>
+          <a href="/test.html">Ollama Cloud Test</a>
+        </nav>
+        <div class="status-block">
+          <span class="label">current stage</span>
+          <strong id="current-stage">loading</strong>
+        </div>
+        <nav id="stage-nav" class="stage-nav" aria-label="Development stage list"></nav>
+      </aside>
+
+      <section class="workspace">
+        <header class="topline">
+          <div>
+            <h1>Development Ledger</h1>
+            <p id="roadmap-line">Roadmap state.</p>
+          </div>
+          <div class="top-actions">
+            <button id="refresh-view" type="button">Refresh View</button>
+            <button id="export-status" type="button">Export Status JSON</button>
+          </div>
+        </header>
+
+        <section class="figures" aria-label="Current figures">
+          <div class="figure">
+            <span>stage</span>
+            <strong id="figure-stage">S06</strong>
+          </div>
+          <div class="figure">
+            <span>tests</span>
+            <strong>37 green</strong>
+          </div>
+          <div class="figure">
+            <span>core theta</span>
+            <strong>dce72747</strong>
+          </div>
+          <div class="figure">
+            <span>next</span>
+            <strong>M2</strong>
+          </div>
+        </section>
+
+        <section class="grid two">
+          <article class="panel">
+            <h2>Stage Record</h2>
+            <dl id="stage-detail" class="kv"></dl>
+          </article>
+
+          <article class="panel">
+            <h2>Verification</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Command</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody id="verification-table"></tbody>
+            </table>
+          </article>
+        </section>
+
+        <section class="grid two">
+          <article class="panel">
+            <h2>What Changed</h2>
+            <ul id="change-list" class="plain-list"></ul>
+          </article>
+
+          <article class="panel">
+            <h2>Files</h2>
+            <ul id="file-list" class="file-list"></ul>
+          </article>
+        </section>
+
+        <section class="panel">
+          <h2>All Stages</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>Status</th>
+                <th>Work</th>
+                <th>Tests</th>
+                <th>Report</th>
+              </tr>
+            </thead>
+            <tbody id="stage-table"></tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

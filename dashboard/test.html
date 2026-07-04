@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AM001 Model Test</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="rail" aria-label="Test navigation">
+        <div class="mark">
+          <span>AM001</span>
+          <span>EDGE</span>
+        </div>
+        <nav class="page-nav" aria-label="Pages">
+          <a href="/">Development</a>
+          <a aria-current="page" href="/test.html">Ollama Cloud Test</a>
+        </nav>
+        <div class="status-block">
+          <span class="label">runtime boundary</span>
+          <strong>browser edge only</strong>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topline">
+          <div>
+            <h1>Ollama Native API Test</h1>
+            <p>Calls Ollama Cloud through the native Ollama API. It does not enter AM core or the runtime loop.</p>
+          </div>
+          <span id="model-state" class="state">not tested</span>
+        </header>
+
+        <section class="panel">
+          <h2>Connection</h2>
+          <form id="model-form" class="form-grid">
+            <label>
+              Provider
+              <select id="model-provider" name="provider">
+                <option value="ollama-cloud">Ollama Cloud native API</option>
+              </select>
+            </label>
+            <label>
+              API base
+              <input id="model-host" name="host" type="url" spellcheck="false" autocomplete="off">
+            </label>
+            <label>
+              Ollama API key
+              <input id="model-key" name="key" type="password" spellcheck="false" autocomplete="off">
+            </label>
+            <label>
+              Available models
+              <select id="available-models" name="models"></select>
+            </label>
+            <label>
+              Selected model
+              <input id="selected-model" name="model" type="text" spellcheck="false" autocomplete="off">
+            </label>
+          </form>
+
+          <div class="button-row">
+            <button id="save-model-config" type="button">Save Config</button>
+            <button id="load-models" type="button">Load Available Models</button>
+            <button id="test-model" type="button">Test Connection</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>AM001 Event Shape Test</h2>
+          <label class="prompt-box">
+            Input text
+            <textarea id="am-input" spellcheck="false">assert rust truth_assert=1 goal_relevance=0.8</textarea>
+          </label>
+          <div class="button-row">
+            <button id="run-model" type="button">Run Model</button>
+            <button id="clear-output" type="button">Clear Output</button>
+          </div>
+        </section>
+
+        <section class="output-grid">
+          <article class="panel">
+            <h2>Model Output</h2>
+            <pre id="model-output"></pre>
+          </article>
+          <article class="panel">
+            <h2>Client Check</h2>
+            <pre id="event-check"></pre>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script src="test.js"></script>
+  </body>
+</html>

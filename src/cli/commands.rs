@@ -2,6 +2,7 @@ use crate::apply::{
     apply_parsed_batch, header_rejection_report, load_staging, parse_batch_text, save_staging,
     staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
 };
+use crate::cli::dashboard::serve_dashboard;
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
 use crate::core::event::Event;
@@ -145,6 +146,12 @@ enum Command {
         theta: Option<PathBuf>,
         #[arg(long)]
         world_theta: Option<PathBuf>,
+    },
+    Dashboard {
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 8765)]
+        port: u16,
     },
 }
 
@@ -386,6 +393,9 @@ pub fn run() -> Result<()> {
                 state.tick,
                 output.termination
             );
+        }
+        Command::Dashboard { host, port } => {
+            serve_dashboard(&host, port)?;
         }
     }
     Ok(())
