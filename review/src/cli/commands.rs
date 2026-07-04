@@ -2,6 +2,7 @@ use crate::apply::{
     apply_parsed_batch, header_rejection_report, load_staging, parse_batch_text, save_staging,
     staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
 };
+use crate::beval::compile::{write_compiled_context, DEFAULT_CONTEXT_BUDGET};
 use crate::beval::{run_beval, BevalConfig, Lane, TransportKind};
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
@@ -10,9 +11,12 @@ use crate::core::inspect::{axes_report, dump_state, format_diff};
 use crate::core::state::AmState;
 use crate::core::step::step_result;
 use crate::core::theta::Theta;
+use crate::dashboard::write_dashboard;
 use crate::eval::sweep::{load_grid, run_sweep};
+use crate::ingest::{distill_file, ingest_file, IngestKind};
 use crate::parser::rule::parse_rule_line;
 use crate::percept::PerceptBridge;
+use crate::provenance::provenance_report;
 use crate::storage::snapshot_file::{load_snapshot, save_snapshot};
 use crate::storage::trace_file::append_trace;
 use crate::world::runner::{run_episode, write_episode_files};
@@ -84,6 +88,8 @@ enum Command {
         events: PathBuf,
         #[arg(long)]
         report: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
     },
     Beval {
         #[arg(long)]
@@ -98,6 +104,52 @@ enum Command {
         record: bool,
         #[arg(long)]
         out: PathBuf,
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+        #[arg(long, default_value_t = DEFAULT_CONTEXT_BUDGET)]
+        context_budget: usize,
+    },
+    CompileContext {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long, default_value_t = DEFAULT_CONTEXT_BUDGET)]
+        budget: usize,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    Ingest {
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        session: String,
+        #[arg(long = "events-out")]
+        events_out: PathBuf,
+    },
+    Distill {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        session: String,
+        #[arg(long = "events-out")]
+        events_out: PathBuf,
+    },
+    Dashboard {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        beval: Vec<PathBuf>,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    Provenance {
+        #[arg(long)]
+        event: i64,
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+        #[arg(long)]
+        trace: Option<PathBuf>,
     },
     Run {
         #[arg(long)]
@@ -224,6 +276,7 @@ pub fn run() -> Result<()> {
             snapshot,
             events,
             report,
+            dry_run,
         } => {
             let text = fs::read_to_string(&events)
                 .with_context(|| format!("read EG-1 events {}", events.display()))?;
@@ -232,7 +285,7 @@ pub fn run() -> Result<()> {
                 Err(rejection) => {
                     let report_doc = header_rejection_report(rejection);
                     emit_apply_report(report.as_deref(), &report_doc)?;
-                    anyhow::bail!("EG-1 file rejected before apply");
+                    exit_apply_rejection("EG-1 file rejected before apply");
                 }
             };
             if parsed.has_structural_rejection() {
@@ -241,7 +294,7 @@ pub fn run() -> Result<()> {
                     parsed.structural_rejections,
                 );
                 emit_apply_report(report.as_deref(), &report_doc)?;
-                anyhow::bail!("EG-1 file has structural rejection");
+                exit_apply_rejection("EG-1 file has structural rejection");
             }
 
             let staging_path = staging_path_for(&snapshot);
@@ -249,14 +302,16 @@ pub fn run() -> Result<()> {
             let mut state = load_or_new(&snapshot, None)?;
             let mut staging = load_staging(&staging_path)?;
             let mut outcome = apply_parsed_batch(&mut state, &parsed, &mut staging)?;
-            outcome.report.staging_file = Some(staging_path.display().to_string());
-            outcome.report.trace_file = Some(trace_path.display().to_string());
-            save_snapshot(&snapshot, &state)?;
-            save_staging(&staging_path, &staging)?;
-            write_trace_file(&trace_path, &outcome.traces)?;
+            if !dry_run {
+                outcome.report.staging_file = Some(staging_path.display().to_string());
+                outcome.report.trace_file = Some(trace_path.display().to_string());
+                save_snapshot(&snapshot, &state)?;
+                save_staging(&staging_path, &staging)?;
+                write_trace_file(&trace_path, &outcome.traces)?;
+            }
             emit_apply_report(report.as_deref(), &outcome.report)?;
             if outcome.report.has_rejections() {
-                anyhow::bail!("EG-1 apply completed with rejected events");
+                exit_apply_rejection("EG-1 apply completed with rejected events");
             }
         }
         Command::Beval {
@@ -266,6 +321,8 @@ pub fn run() -> Result<()> {
             fixtures,
             record,
             out,
+            snapshot,
+            context_budget,
         } => {
             let config = BevalConfig {
                 corpus_dir: corpus,
@@ -274,6 +331,8 @@ pub fn run() -> Result<()> {
                 fixtures_dir: fixtures,
                 record,
                 out,
+                snapshot,
+                context_budget,
             };
             let results = run_beval(&config)?;
             println!(
@@ -284,6 +343,68 @@ pub fn run() -> Result<()> {
                 results.skipped,
                 config.out.display()
             );
+        }
+        Command::CompileContext {
+            snapshot,
+            budget,
+            out,
+        } => {
+            let context = write_compiled_context(snapshot, budget, &out)?;
+            println!(
+                "compile-context out={} tokens={}",
+                out.display(),
+                crate::beval::prompt::token_count(&context)
+            );
+        }
+        Command::Ingest {
+            kind,
+            input,
+            session,
+            events_out,
+        } => match ingest_file(IngestKind::parse(&kind)?, input, &session, &events_out) {
+            Ok(events) => {
+                println!(
+                    "ingest kind={} events_out={} bytes={}",
+                    kind,
+                    events_out.display(),
+                    events.len()
+                );
+            }
+            Err(err) => exit_apply_rejection(&format!("ingest rejected: {err}")),
+        },
+        Command::Distill {
+            input,
+            session,
+            events_out,
+        } => match distill_file(input, &session, &events_out) {
+            Ok(events) => {
+                println!(
+                    "distill events_out={} bytes={}",
+                    events_out.display(),
+                    events.len()
+                );
+            }
+            Err(err) => exit_apply_rejection(&format!("distill rejected: {err}")),
+        },
+        Command::Dashboard {
+            snapshot,
+            beval,
+            out,
+        } => {
+            let html = write_dashboard(snapshot, &beval, &out)?;
+            println!("dashboard out={} bytes={}", out.display(), html.len());
+        }
+        Command::Provenance {
+            event,
+            snapshot,
+            trace,
+        } => {
+            let trace_path = match (trace, snapshot) {
+                (Some(path), _) => path,
+                (None, Some(snapshot)) => trace_path_for(&snapshot),
+                (None, None) => anyhow::bail!("provenance requires --trace or --snapshot"),
+            };
+            print!("{}", provenance_report(trace_path, event)?);
         }
         Command::Run {
             snapshot,
@@ -463,4 +584,9 @@ fn emit_apply_report(path: Option<&Path>, report: &ApplyReport) -> Result<()> {
         );
         Ok(())
     }
+}
+
+fn exit_apply_rejection(message: &str) -> ! {
+    eprintln!("Error: {message}");
+    std::process::exit(1);
 }

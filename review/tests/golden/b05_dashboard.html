@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AM Dashboard</title>
+<style>
+:root { color-scheme: light; --ink:#182026; --muted:#5a6670; --line:#d7dde2; --panel:#f8fafb; --good:#1f7a4d; --warn:#a45d12; --bad:#a12626; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:#ffffff; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+h1 { font-size: 24px; margin: 0 0 16px; letter-spacing: 0; }
+h2 { font-size: 16px; margin: 28px 0 10px; letter-spacing: 0; }
+.summary { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:8px; }
+.metric { border:1px solid var(--line); border-radius:6px; padding:10px 12px; background:var(--panel); }
+.metric b { display:block; font-size:12px; color:var(--muted); font-weight:600; }
+.metric span { display:block; font-size:20px; margin-top:3px; }
+table { width:100%; border-collapse: collapse; font-size:13px; }
+th, td { border-bottom:1px solid var(--line); padding:7px 8px; text-align:left; vertical-align:top; }
+th { color:var(--muted); font-size:12px; font-weight:700; background:#f1f4f6; }
+.axis { display:inline-block; margin:0 5px 4px 0; padding:2px 5px; border-radius:4px; background:#eef3f6; }
+.empty { color:var(--muted); font-style:italic; }
+.good { color:var(--good); font-weight:700; }
+.warn { color:var(--warn); font-weight:700; }
+.bad { color:var(--bad); font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+<h1>AM Dashboard</h1>
+<section class="summary" id="summary"></section>
+<h2>Active Rows</h2>
+<div id="active"></div>
+<h2>Strong Links</h2>
+<div id="links"></div>
+<h2>Open Contradictions</h2>
+<div id="contradictions"></div>
+<h2>B-Eval Results</h2>
+<div id="beval"></div>
+</main>
+<script id="am-data" type="application/json">{
+  "schema": "AM-DASHBOARD-1",
+  "snapshot": {
+    "theta_hash": "6905c5f8beede6bd3dfd9fc403626eafb433488291667610d11f0db54f23520c",
+    "tick": 7,
+    "row_count": 2,
+    "active_rows": [
+      {
+        "label": "cpt_1",
+        "activation": 0.0,
+        "baseline": 0.21228702,
+        "certainty": 0.820119,
+        "axes": [
+          {
+            "name": "truth_assert",
+            "value": 0.73443204
+          }
+        ]
+      },
+      {
+        "label": "cpt_2",
+        "activation": 0.0,
+        "baseline": 0.05364891,
+        "certainty": 0.8350732,
+        "axes": [
+          {
+            "name": "project_relevance",
+            "value": 1.0
+          },
+          {
+            "name": "implementation_relevance",
+            "value": 0.8
+          },
+          {
+            "name": "confidence_proxy",
+            "value": 0.7
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "source": "cpt_1",
+        "target": "cpt_2",
+        "weight": 0.3
+      }
+    ],
+    "contradictions": [
+      {
+        "label": "cpt_1",
+        "axis": "truth_assert",
+        "min_axis_cert": 0.46990386
+      }
+    ],
+    "goals": [
+      "cpt_2"
+    ]
+  },
+  "beval": [
+    {
+      "path": "tests/golden/b05_beval.json",
+      "lane": "b2",
+      "evaluated": 29,
+      "skipped": 0,
+      "mean_context_tokens": 533.0,
+      "categories": [
+        {
+          "category": "stage_accuracy",
+          "matched": 8,
+          "total": 8,
+          "accuracy": 1.0
+        },
+        {
+          "category": "stale_claim",
+          "matched": 5,
+          "total": 5,
+          "accuracy": 1.0
+        },
+        {
+          "category": "contradiction_handling",
+          "matched": 5,
+          "total": 5,
+          "accuracy": 1.0
+        }
+      ]
+    }
+  ]
+}</script>
+<script>
+const data = JSON.parse(document.getElementById('am-data').textContent);
+const esc = value => String(value).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const metric = (name, value) => `<div class="metric"><b>${esc(name)}</b><span>${esc(value)}</span></div>`;
+document.getElementById('summary').innerHTML = [
+  metric('theta hash', data.snapshot.theta_hash.slice(0, 12)),
+  metric('tick', data.snapshot.tick),
+  metric('rows', data.snapshot.row_count),
+  metric('open contradictions', data.snapshot.contradictions.length),
+  metric('beval reports', data.beval.length)
+].join('');
+function table(headers, rows, empty) {
+  if (!rows.length) return `<p class="empty">${esc(empty)}</p>`;
+  return `<table><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+document.getElementById('active').innerHTML = table(['label','a','b','cert','axes'], data.snapshot.active_rows.map(row =>
+  `<tr><td>${esc(row.label)}</td><td>${row.activation.toFixed(2)}</td><td>${row.baseline.toFixed(2)}</td><td>${row.certainty.toFixed(2)}</td><td>${row.axes.map(axis => `<span class="axis">${esc(axis.name)} ${axis.value >= 0 ? '+' : ''}${axis.value.toFixed(2)}</span>`).join('')}</td></tr>`
+), 'no allocated rows');
+document.getElementById('links').innerHTML = table(['source','weight','target'], data.snapshot.links.map(link =>
+  `<tr><td>${esc(link.source)}</td><td>${link.weight.toFixed(2)}</td><td>${esc(link.target)}</td></tr>`
+), 'no links');
+document.getElementById('contradictions').innerHTML = table(['label','axis','min-axis cert'], data.snapshot.contradictions.map(item =>
+  `<tr><td>${esc(item.label)}</td><td>${esc(item.axis)}</td><td class="warn">${item.min_axis_cert.toFixed(2)}</td></tr>`
+), 'no open contradictions');
+document.getElementById('beval').innerHTML = table(['lane','evaluated','skipped','mean ctx','categories'], data.beval.map(report =>
+  `<tr><td>${esc(report.lane)}</td><td>${report.evaluated}</td><td>${report.skipped}</td><td>${report.mean_context_tokens.toFixed(1)}</td><td>${report.categories.map(cat => `<span class="${cat.accuracy === 1 ? 'good' : cat.accuracy === 0 ? 'bad' : 'warn'}">${esc(cat.category)} ${cat.matched}/${cat.total}</span>`).join(' ')}</td></tr>`
+), 'no beval results supplied');
+</script>
+</body>
+</html>

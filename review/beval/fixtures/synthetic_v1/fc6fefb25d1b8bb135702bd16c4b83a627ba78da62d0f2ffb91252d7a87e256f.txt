@@ -1,1 +1,0 @@
-ANSWER: stale; existing StepTrace.event_id and MutationRecord.event_id were sufficient.

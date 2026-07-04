@@ -31,8 +31,8 @@ pub fn build_prompt(lane: Lane, task: &Task, context: &LaneContext) -> String {
             context.text, task.id, task.category, task.question
         ),
         Lane::B2 => format!(
-            "AM001 Track B eval lane=b2\nB2 context compiler is unavailable in B02.\nTask id: {}\nQuestion:\n{}\n",
-            task.id, task.question
+            "AM001 Track B eval lane=b2\nReturn exactly one line in this envelope:\nANSWER: <one line>\nNo extra text.\nCompiled AM context follows.\n[AM_CONTEXT_BEGIN]\n{}\n[AM_CONTEXT_END]\nTask id: {}\nCategory: {}\nQuestion:\n{}\n",
+            context.text, task.id, task.category, task.question
         ),
     }
 }

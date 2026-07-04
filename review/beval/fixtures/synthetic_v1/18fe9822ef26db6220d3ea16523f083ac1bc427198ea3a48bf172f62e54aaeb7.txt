@@ -1,0 +1,1 @@
+ANSWER: FLAG_CONTRADICTION theta stability

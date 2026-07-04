@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "schema": "BEVAL-1",
+    "lane": "b2",
+    "transport": "replay",
+    "transport_metadata": {
+      "kind": "replay",
+      "synthetic": true,
+      "fixture_manifest_version": "synthetic_v1",
+      "model": null,
+      "digest": null,
+      "temperature": null,
+      "seed": null,
+      "endpoint": null
+    },
+    "corpus_task_count": 29
+  },
+  "evaluated": 29,
+  "skipped": 0,
+  "category_scores": [
+    {
+      "category": "stage_accuracy",
+      "matched": 8,
+      "total": 8,
+      "accuracy": 1.0
+    },
+    {
+      "category": "stale_claim",
+      "matched": 5,
+      "total": 5,
+      "accuracy": 1.0
+    },
+    {
+      "category": "contradiction_handling",
+      "matched": 5,
+      "total": 5,
+      "accuracy": 1.0
+    }
+  ],
+  "stale_claim_rate": 0.0,
+  "stale_repeats": 0,
+  "stale_total": 5,
+  "drift": {
+    "evaluated_groups": 3,
+    "mismatched_groups": 0,
+    "drift_rate": 0.0
+  },
+  "token_cost": {
+    "mean_context_tokens": 533.0,
+    "total_context_tokens": 15457
+  },
+  "task_results": []
+}

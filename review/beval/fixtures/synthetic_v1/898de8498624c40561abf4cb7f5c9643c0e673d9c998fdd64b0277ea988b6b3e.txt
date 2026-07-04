@@ -1,1 +1,0 @@
-ANSWER: stale; current default is eta_w=0.30.

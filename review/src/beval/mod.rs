@@ -1,18 +1,18 @@
+pub mod compile;
 pub mod corpus;
 pub mod prompt;
 pub mod results;
 pub mod scoring;
 pub mod transport;
 
+use crate::beval::compile::compile_context_from_snapshot;
 use crate::beval::corpus::{load_corpus, Category, Task};
 use crate::beval::prompt::{build_prompt, context_token_count, load_b1_context, LaneContext};
 use crate::beval::results::{
-    BevalResults, CategoryScore, DriftScore, RunMetadata, TaskResult, TokenCost, TransportMetadata,
+    BevalResults, CategoryScore, DriftScore, RunMetadata, TaskResult, TokenCost,
 };
 use crate::beval::scoring::score_response;
-use crate::beval::transport::{
-    prompt_hash, write_recorded_fixture, FixtureManifest, LlmTransport, ReplayTransport,
-};
+use crate::beval::transport::{prompt_hash, write_recorded_fixture, LlmTransport, ReplayTransport};
 use crate::llm::ollama_client::OllamaTransport;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -98,25 +98,24 @@ pub struct BevalConfig {
     pub fixtures_dir: PathBuf,
     pub record: bool,
     pub out: PathBuf,
+    pub snapshot: Option<PathBuf>,
+    pub context_budget: usize,
 }
 
 pub fn run_beval(config: &BevalConfig) -> Result<BevalResults> {
     let tasks = load_corpus(&config.corpus_dir)?;
-    let results = match config.lane {
-        Lane::B2 => run_lane_unavailable(config, &tasks)?,
-        Lane::B0 | Lane::B1 => match config.transport {
-            TransportKind::Replay => {
-                if config.record {
-                    anyhow::bail!("--record is only valid with --transport live");
-                }
-                let mut transport = ReplayTransport::new(&config.fixtures_dir)?;
-                run_lane(config, &tasks, &mut transport, None)?
+    let results = match config.transport {
+        TransportKind::Replay => {
+            if config.record {
+                anyhow::bail!("--record is only valid with --transport live");
             }
-            TransportKind::Live => {
-                let mut transport = OllamaTransport::from_env()?;
-                run_lane(config, &tasks, &mut transport, Some(&config.fixtures_dir))?
-            }
-        },
+            let mut transport = ReplayTransport::new(&config.fixtures_dir)?;
+            run_lane(config, &tasks, &mut transport, None)?
+        }
+        TransportKind::Live => {
+            let mut transport = OllamaTransport::from_env()?;
+            run_lane(config, &tasks, &mut transport, Some(&config.fixtures_dir))?
+        }
     };
     write_results(&config.out, &results)?;
     Ok(results)
@@ -131,7 +130,17 @@ fn run_lane<T: LlmTransport>(
     let context = match config.lane {
         Lane::B0 => LaneContext::empty(),
         Lane::B1 => load_b1_context(&config.fixtures_dir, B1_CONTEXT_BUDGET_TOKENS)?,
-        Lane::B2 => unreachable!("B2 is handled as LaneUnavailable in B02"),
+        Lane::B2 => {
+            let snapshot = config
+                .snapshot
+                .as_deref()
+                .context("lane b2 requires --snapshot")?;
+            let text = compile_context_from_snapshot(snapshot, config.context_budget)?;
+            LaneContext {
+                tokens: crate::beval::prompt::token_count(&text),
+                text,
+            }
+        }
     };
 
     let mut task_results = Vec::new();
@@ -180,31 +189,6 @@ fn run_lane<T: LlmTransport>(
         task_results,
         total_context_tokens,
     ))
-}
-
-fn run_lane_unavailable(config: &BevalConfig, tasks: &[Task]) -> Result<BevalResults> {
-    let manifest = if config.transport == TransportKind::Replay {
-        Some(FixtureManifest::load(&config.fixtures_dir)?)
-    } else {
-        None
-    };
-    let task_results = tasks
-        .iter()
-        .map(|task| TaskResult::skipped(task, Lane::B2, "LaneUnavailable"))
-        .collect();
-    let transport_metadata = if let Some(manifest) = manifest {
-        TransportMetadata::replay(manifest.synthetic, manifest.version)
-    } else {
-        TransportMetadata::lane_unavailable()
-    };
-    let metadata = RunMetadata {
-        schema: RESULTS_SCHEMA.to_string(),
-        lane: Lane::B2,
-        transport: config.transport,
-        transport_metadata,
-        corpus_task_count: tasks.len(),
-    };
-    Ok(assemble_results(metadata, task_results, 0))
 }
 
 fn assemble_results(

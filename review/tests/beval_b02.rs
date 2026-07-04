@@ -66,13 +66,13 @@ fn scorer_matchers_deterministic() {
 }
 
 #[test]
-fn replay_double_run_byte_identical() {
+fn replay_double_run_byte_identical_b0_b1() {
     for lane in [Lane::B0, Lane::B1] {
         let dir = tempdir().unwrap();
         let out1 = dir.path().join(format!("{}-1.json", lane.as_str()));
         let out2 = dir.path().join(format!("{}-2.json", lane.as_str()));
-        let config1 = config(lane, &out1);
-        let config2 = config(lane, &out2);
+        let config1 = config(lane, &out1, None);
+        let config2 = config(lane, &out2, None);
         run_beval(&config1).unwrap();
         run_beval(&config2).unwrap();
         assert_eq!(fs::read(&out1).unwrap(), fs::read(&out2).unwrap());
@@ -80,16 +80,13 @@ fn replay_double_run_byte_identical() {
 }
 
 #[test]
-fn b2_lane_unavailable_skips_without_zero_fill() {
+fn b2_lane_requires_snapshot() {
     let dir = tempdir().unwrap();
     let out = dir.path().join("b2.json");
-    let results = run_beval(&config(Lane::B2, &out)).unwrap();
-    assert_eq!(results.evaluated, 0);
-    assert_eq!(results.skipped, 29);
-    assert!(results
-        .task_results
-        .iter()
-        .all(|task| task.skip_reason.as_deref() == Some("LaneUnavailable")));
+    let err = run_beval(&config(Lane::B2, &out, None))
+        .unwrap_err()
+        .to_string();
+    assert_eq!(err, "lane b2 requires --snapshot");
 }
 
 #[test]
@@ -176,16 +173,32 @@ fn apply_rejection_exit_prints_one_clean_error_line() {
 "#,
     )
     .unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_am"))
-        .args([
-            "apply",
-            "--snapshot",
-            snapshot.to_str().unwrap(),
-            "--events",
-            events.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
+    assert_clean_apply_rejection(&snapshot, &events, None);
+    assert_clean_apply_rejection(&snapshot, &events, Some("1"));
+}
+
+fn assert_clean_apply_rejection(
+    snapshot: &std::path::Path,
+    events: &std::path::Path,
+    rust_backtrace: Option<&str>,
+) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_am"));
+    command.args([
+        "apply",
+        "--snapshot",
+        snapshot.to_str().unwrap(),
+        "--events",
+        events.to_str().unwrap(),
+    ]);
+    match rust_backtrace {
+        Some(value) => {
+            command.env("RUST_BACKTRACE", value);
+        }
+        None => {
+            command.env_remove("RUST_BACKTRACE");
+        }
+    }
+    let output = command.output().unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
     let lines = stderr.lines().collect::<Vec<_>>();
@@ -194,7 +207,7 @@ fn apply_rejection_exit_prints_one_clean_error_line() {
     assert!(!stderr.to_lowercase().contains("backtrace"));
 }
 
-fn config(lane: Lane, out: &std::path::Path) -> BevalConfig {
+fn config(lane: Lane, out: &std::path::Path, snapshot: Option<std::path::PathBuf>) -> BevalConfig {
     BevalConfig {
         corpus_dir: "beval/corpus".into(),
         lane,
@@ -202,6 +215,8 @@ fn config(lane: Lane, out: &std::path::Path) -> BevalConfig {
         fixtures_dir: "beval/fixtures/synthetic_v1".into(),
         record: false,
         out: out.to_path_buf(),
+        snapshot,
+        context_budget: am001::beval::compile::DEFAULT_CONTEXT_BUDGET,
     }
 }
 
