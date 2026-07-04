@@ -1,0 +1,26 @@
+{
+  "id": "stale_del_w_002",
+  "category": "stale_claim",
+  "question": "A raw log says del_w default is 0.002. What is the current correction?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "stale",
+          "del_w=0.0"
+        ]
+      },
+      {
+        "type": "must_contain_none",
+        "values": [
+          "del_w=0.002"
+        ]
+      }
+    ],
+    "stale_markers": [
+      "del_w=0.002"
+    ]
+  },
+  "source_ref": "docs/AM_CORE_V0_AMENDMENTS.md:36"
+}

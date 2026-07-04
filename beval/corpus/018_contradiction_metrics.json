@@ -1,0 +1,18 @@
+{
+  "id": "contradiction_metrics",
+  "category": "contradiction_handling",
+  "question": "B2 snapshot has an open contradiction on Track B metrics. Produce the required structured marker.",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "FLAG_CONTRADICTION",
+          "metrics"
+        ]
+      }
+    ]
+  },
+  "source_ref": "docs/AM_TRACK_B_ROADMAP.md:18-19",
+  "requires_lane": "b2"
+}

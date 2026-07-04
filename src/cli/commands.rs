@@ -2,6 +2,7 @@ use crate::apply::{
     apply_parsed_batch, header_rejection_report, load_staging, parse_batch_text, save_staging,
     staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
 };
+use crate::beval::{run_beval, BevalConfig, Lane, TransportKind};
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
 use crate::core::event::Event;
@@ -83,6 +84,20 @@ enum Command {
         events: PathBuf,
         #[arg(long)]
         report: Option<PathBuf>,
+    },
+    Beval {
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        lane: String,
+        #[arg(long)]
+        transport: String,
+        #[arg(long)]
+        fixtures: PathBuf,
+        #[arg(long)]
+        record: bool,
+        #[arg(long)]
+        out: PathBuf,
     },
     Run {
         #[arg(long)]
@@ -243,6 +258,32 @@ pub fn run() -> Result<()> {
             if outcome.report.has_rejections() {
                 anyhow::bail!("EG-1 apply completed with rejected events");
             }
+        }
+        Command::Beval {
+            corpus,
+            lane,
+            transport,
+            fixtures,
+            record,
+            out,
+        } => {
+            let config = BevalConfig {
+                corpus_dir: corpus,
+                lane: lane.parse::<Lane>()?,
+                transport: transport.parse::<TransportKind>()?,
+                fixtures_dir: fixtures,
+                record,
+                out,
+            };
+            let results = run_beval(&config)?;
+            println!(
+                "beval lane={} transport={} evaluated={} skipped={} out={}",
+                results.metadata.lane,
+                results.metadata.transport.as_str(),
+                results.evaluated,
+                results.skipped,
+                config.out.display()
+            );
         }
         Command::Run {
             snapshot,

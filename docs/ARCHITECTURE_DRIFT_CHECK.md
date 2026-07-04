@@ -7,6 +7,7 @@ Checklist:
 - No Python files.
 - No `rand` in `src/core/`.
 - No LLM/Ollama/client/http calls in `src/core/`.
+- B02 transport amendment: at most one minimal HTTP client dependency may be present, and if present it must be imported only inside `src/llm/`. The current implementation uses only `std::net` inside `src/llm/ollama_client.rs`.
 - Dynamics never read trace files or trace history.
 - Labels are inspection/resolution metadata only and never allocation state.
 - `settle`, `write`, `hebb`, and `decay` must not depend on label metadata.

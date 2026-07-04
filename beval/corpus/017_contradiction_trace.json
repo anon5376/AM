@@ -1,0 +1,18 @@
+{
+  "id": "contradiction_trace",
+  "category": "contradiction_handling",
+  "question": "B2 snapshot has an open contradiction on trace provenance. Produce the required structured marker.",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "must_contain_all",
+        "values": [
+          "FLAG_CONTRADICTION",
+          "trace provenance"
+        ]
+      }
+    ]
+  },
+  "source_ref": "docs/EVENT_GRAMMAR.md:77",
+  "requires_lane": "b2"
+}

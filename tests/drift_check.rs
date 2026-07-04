@@ -13,7 +13,7 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
             "forbidden dependency found: {forbidden}"
         );
     }
-    for forbidden in [
+    let network_deps = [
         "reqwest",
         "ureq",
         "hyper",
@@ -23,12 +23,15 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
         "curl",
         "isahc",
         "surf",
-    ] {
-        assert!(
-            !contains_token(&cargo, forbidden),
-            "forbidden B-track network dependency found: {forbidden}"
-        );
-    }
+    ];
+    let present_network_deps = network_deps
+        .iter()
+        .filter(|dep| contains_token(&cargo, dep))
+        .count();
+    assert!(
+        present_network_deps <= 1,
+        "B02 permits at most one scoped HTTP client dependency, found {present_network_deps}"
+    );
     assert_no_python(Path::new("."));
 
     let core_sources = collect_rs(Path::new("src/core"));
@@ -70,6 +73,7 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
         let normalized = path.to_string_lossy();
         let dormant_seam =
             normalized.starts_with("src/llm/") || normalized == "src/parser/ollama.rs";
+        let beval_boundary = normalized.starts_with("src/beval/");
         if dormant_seam {
             continue;
         }
@@ -82,7 +86,6 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
             "tokio",
             "websocket",
             "tungstenite",
-            "ollama_client",
             "parse_with_ollama",
         ] {
             assert!(
@@ -91,15 +94,33 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
                 path.display()
             );
         }
+        if !beval_boundary {
+            assert!(
+                !contains_token(&lower, "ollama_client"),
+                "forbidden B-track runtime token `ollama_client` in {}",
+                path.display()
+            );
+        }
         for line in lower
             .lines()
             .filter(|line| line.trim_start().starts_with("use "))
         {
-            assert!(
-                !line.contains("::llm") && !line.contains("ollama"),
-                "forbidden B-track LLM import in {}: {line}",
-                path.display()
-            );
+            if beval_boundary {
+                assert!(
+                    !line.contains("reqwest")
+                        && !line.contains("ureq")
+                        && !line.contains("hyper")
+                        && !line.contains("tokio"),
+                    "HTTP client import outside src/llm in {}: {line}",
+                    path.display()
+                );
+            } else {
+                assert!(
+                    !line.contains("::llm") && !line.contains("ollama"),
+                    "forbidden B-track LLM import in {}: {line}",
+                    path.display()
+                );
+            }
         }
     }
 

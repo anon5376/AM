@@ -1,0 +1,14 @@
+{
+  "id": "stage_b1_budget",
+  "category": "stage_accuracy",
+  "question": "What raw-log token budget is pinned for B1?",
+  "answer_key": {
+    "matchers": [
+      {
+        "type": "exact",
+        "value": "8000 tokens"
+      }
+    ]
+  },
+  "source_ref": "docs/AM_TRACK_B_ROADMAP.md:16"
+}
