@@ -219,3 +219,65 @@ Apply summaries:
 ### Next
 
 B05 static dashboard.
+
+## B05 — Static Dashboard
+
+### Workstream
+
+- Added `src/dashboard/mod.rs`.
+- Added `am dashboard --snapshot <p> [--beval <results.json>...] --out <dash.html>`.
+- Dashboard output is a single self-contained HTML file with embedded JSON, inline CSS, and vanilla inline JS. It has no server, no network URLs, no external script/link tags, and no dependency on the quarantined prototype branch.
+- Snapshot panels cover summary metrics, active rows, strong links, open contradictions, and beval category summaries.
+- Added deterministic golden coverage and an embedded JSON smoke test.
+
+### Commands
+
+```text
+$ cargo test --test dashboard_b05 -- --nocapture
+running 2 tests
+test dashboard_embedded_json_smoke ... ok
+test dashboard_cli_matches_golden_and_is_self_contained ... ok
+test result: ok. 2 passed; 0 failed
+```
+
+```text
+$ cargo fmt && cargo clippy -- -D warnings && cargo test
+76 tests passed; 0 failed
+```
+
+### Demo
+
+```text
+$ am dashboard --snapshot <dash.bin> --beval tests/golden/b05_beval.json --out tests/golden/b05_dashboard.html
+dashboard out=tests/golden/b05_dashboard.html bytes=6071
+```
+
+### Hashes
+
+```text
+$ shasum -a 256 tests/golden/b05_dashboard.html tests/golden/b05_beval.json
+b52775e043722d53151b0ba0aa48b772cec74c70253b6b2a7bfd844532546d71  tests/golden/b05_dashboard.html
+c82201cd65da4303b368d50ce17b26c49f6acf162b6cc8f65a2146b62fb43e47  tests/golden/b05_beval.json
+```
+
+### Files Changed
+
+- `src/dashboard/mod.rs`
+- `src/lib.rs`
+- `src/cli/commands.rs`
+- `tests/dashboard_b05.rs`
+- `tests/golden/b05_dashboard.html`
+- `tests/golden/b05_beval.json`
+- `docs/BUILD_REPORT_NIGHT2.md`
+
+### Deviations
+
+- B05 implements the static inspection dashboard requested in the Night2 block. It does not implement the broader future B05 roadmap lane comparison/apply-reject UI; that remains outside this block and would require a separate prompt.
+
+### Known Limitations
+
+- Dashboard HTML is read-only. It intentionally cannot mutate snapshots, staging, or EG-1 files.
+
+### Next
+
+Extras: `am apply --dry-run`, `am provenance --event <id>`, `docs/TRACK_B_README.md`, final archive/review zip.

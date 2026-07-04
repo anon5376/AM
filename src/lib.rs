@@ -2,6 +2,7 @@ pub mod apply;
 pub mod beval;
 pub mod cli;
 pub mod core;
+pub mod dashboard;
 pub mod eval;
 pub mod ingest;
 pub mod llm;

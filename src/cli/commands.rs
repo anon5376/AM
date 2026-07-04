@@ -11,6 +11,7 @@ use crate::core::inspect::{axes_report, dump_state, format_diff};
 use crate::core::state::AmState;
 use crate::core::step::step_result;
 use crate::core::theta::Theta;
+use crate::dashboard::write_dashboard;
 use crate::eval::sweep::{load_grid, run_sweep};
 use crate::ingest::{distill_file, ingest_file, IngestKind};
 use crate::parser::rule::parse_rule_line;
@@ -130,6 +131,14 @@ enum Command {
         session: String,
         #[arg(long = "events-out")]
         events_out: PathBuf,
+    },
+    Dashboard {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        beval: Vec<PathBuf>,
+        #[arg(long)]
+        out: PathBuf,
     },
     Run {
         #[arg(long)]
@@ -363,6 +372,14 @@ pub fn run() -> Result<()> {
             }
             Err(err) => exit_apply_rejection(&format!("distill rejected: {err}")),
         },
+        Command::Dashboard {
+            snapshot,
+            beval,
+            out,
+        } => {
+            let html = write_dashboard(snapshot, &beval, &out)?;
+            println!("dashboard out={} bytes={}", out.display(), html.len());
+        }
         Command::Run {
             snapshot,
             events,
