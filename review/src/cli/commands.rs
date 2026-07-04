@@ -1,3 +1,7 @@
+use crate::apply::{
+    apply_parsed_batch, header_rejection_report, load_staging, parse_batch_text, save_staging,
+    staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
+};
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
 use crate::core::event::Event;
@@ -71,6 +75,14 @@ enum Command {
         theta: Option<PathBuf>,
         #[arg(long)]
         diff: bool,
+    },
+    Apply {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        events: PathBuf,
+        #[arg(long)]
+        report: Option<PathBuf>,
     },
     Run {
         #[arg(long)]
@@ -192,6 +204,45 @@ pub fn run() -> Result<()> {
                 print!("{}", format_diff(&state, &trace));
             }
             save_snapshot(snapshot, &state)?;
+        }
+        Command::Apply {
+            snapshot,
+            events,
+            report,
+        } => {
+            let text = fs::read_to_string(&events)
+                .with_context(|| format!("read EG-1 events {}", events.display()))?;
+            let parsed = match parse_batch_text(&text) {
+                Ok(parsed) => parsed,
+                Err(rejection) => {
+                    let report_doc = header_rejection_report(rejection);
+                    emit_apply_report(report.as_deref(), &report_doc)?;
+                    anyhow::bail!("EG-1 file rejected before apply");
+                }
+            };
+            if parsed.has_structural_rejection() {
+                let report_doc = ApplyReport::from_verdicts(
+                    parsed.rejections.clone(),
+                    parsed.structural_rejections,
+                );
+                emit_apply_report(report.as_deref(), &report_doc)?;
+                anyhow::bail!("EG-1 file has structural rejection");
+            }
+
+            let staging_path = staging_path_for(&snapshot);
+            let trace_path = trace_path_for(&snapshot);
+            let mut state = load_or_new(&snapshot, None)?;
+            let mut staging = load_staging(&staging_path)?;
+            let mut outcome = apply_parsed_batch(&mut state, &parsed, &mut staging)?;
+            outcome.report.staging_file = Some(staging_path.display().to_string());
+            outcome.report.trace_file = Some(trace_path.display().to_string());
+            save_snapshot(&snapshot, &state)?;
+            save_staging(&staging_path, &staging)?;
+            write_trace_file(&trace_path, &outcome.traces)?;
+            emit_apply_report(report.as_deref(), &outcome.report)?;
+            if outcome.report.has_rejections() {
+                anyhow::bail!("EG-1 apply completed with rejected events");
+            }
         }
         Command::Run {
             snapshot,
@@ -359,4 +410,16 @@ fn read_event_json(path: &Path) -> Result<Event> {
     let text =
         fs::read_to_string(path).with_context(|| format!("read event {}", path.display()))?;
     serde_json::from_str(&text).context("parse event json")
+}
+
+fn emit_apply_report(path: Option<&Path>, report: &ApplyReport) -> Result<()> {
+    if let Some(path) = path {
+        write_report(path, report)
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(report).context("serialize apply report")?
+        );
+        Ok(())
+    }
 }

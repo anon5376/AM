@@ -13,6 +13,22 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
             "forbidden dependency found: {forbidden}"
         );
     }
+    for forbidden in [
+        "reqwest",
+        "ureq",
+        "hyper",
+        "tokio",
+        "websocket",
+        "tungstenite",
+        "curl",
+        "isahc",
+        "surf",
+    ] {
+        assert!(
+            !contains_token(&cargo, forbidden),
+            "forbidden B-track network dependency found: {forbidden}"
+        );
+    }
     assert_no_python(Path::new("."));
 
     let core_sources = collect_rs(Path::new("src/core"));
@@ -41,6 +57,60 @@ fn architecture_drift_scan_rejects_forbidden_dependencies_and_python() {
                 path.display()
             );
         }
+        for forbidden in ["staging", "provenance", "llm_claim", "eventsource", "eg-1"] {
+            assert!(
+                !contains_token(&lower, forbidden),
+                "B-track bridge token `{forbidden}` leaked into core file {}",
+                path.display()
+            );
+        }
+    }
+
+    for path in collect_rs(Path::new("src")) {
+        let normalized = path.to_string_lossy();
+        let dormant_seam =
+            normalized.starts_with("src/llm/") || normalized == "src/parser/ollama.rs";
+        if dormant_seam {
+            continue;
+        }
+        let text = fs::read_to_string(&path).unwrap();
+        let lower = text.to_lowercase();
+        for forbidden in [
+            "reqwest",
+            "ureq",
+            "hyper",
+            "tokio",
+            "websocket",
+            "tungstenite",
+            "ollama_client",
+            "parse_with_ollama",
+        ] {
+            assert!(
+                !contains_token(&lower, forbidden),
+                "forbidden B-track runtime token `{forbidden}` in {}",
+                path.display()
+            );
+        }
+        for line in lower
+            .lines()
+            .filter(|line| line.trim_start().starts_with("use "))
+        {
+            assert!(
+                !line.contains("::llm") && !line.contains("ollama"),
+                "forbidden B-track LLM import in {}: {line}",
+                path.display()
+            );
+        }
+    }
+
+    let state_text = fs::read_to_string("src/core/state.rs")
+        .unwrap()
+        .to_lowercase();
+    for forbidden in ["raw_text", "prompt", "chat", "transcript", "message_text"] {
+        assert!(
+            !contains_token(&state_text, forbidden),
+            "raw-text persistence token `{forbidden}` in AM state"
+        );
     }
 
     for path in [

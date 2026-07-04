@@ -1,2 +1,0 @@
-theta_hash,n,completion_assemblies,valid,lam_settle,beta,gamma,th0,k_i,eta_w,del_w,th_write,rho_b,a_init,b0,th_act,t,determinism,completion,reinforcement,contradiction,forgetting,diff_integrity,all_pass,completion_recall,completion_contamination,recall_margin_095,failures
-6905c5f8beede6bd3dfd9fc403626eafb433488291667610d11f0db54f23520c,4096,30,true,0.55,1.4,1.2,3,3,0.3,0,0.4,0.01,0.6,0.05,0.25,20,true,true,true,true,true,true,true,1.000000,0.000000,1.000000,""
