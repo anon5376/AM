@@ -281,3 +281,79 @@ c82201cd65da4303b368d50ce17b26c49f6acf162b6cc8f65a2146b62fb43e47  tests/golden/b
 ### Next
 
 Extras: `am apply --dry-run`, `am provenance --event <id>`, `docs/TRACK_B_README.md`, final archive/review zip.
+
+## Extras — Dry Run, Provenance, README
+
+### Workstream
+
+- Added `am apply --dry-run`, using the normal EG-1 parser and apply simulation while skipping snapshot, staging, and trace writes.
+- Added `am provenance --event <id> --snapshot <p>` and `am provenance --event <id> --trace <trace.jsonl>`.
+- Added `docs/TRACK_B_README.md` with the current local Track B command flow and boundaries.
+
+### Commands
+
+```text
+$ cargo test --test track_b_extras -- --nocapture
+running 2 tests
+test apply_dry_run_reports_without_writing_state_sidecars_or_trace ... ok
+test provenance_summarizes_apply_trace_by_event_id ... ok
+test result: ok. 2 passed; 0 failed
+```
+
+```text
+$ cargo fmt && cargo clippy -- -D warnings && cargo test
+78 tests passed; 0 failed
+```
+
+### Demo
+
+```text
+$ am apply --dry-run --snapshot <am.bin> --events <events.jsonl> --report <dry.json>
+dry_snapshot_exists=no dry_trace_exists=no
+{"applied":1,"staged":0,"rejected":0,"committed_from_staging":0,"expired":0,"structural_rejections":0}
+```
+
+```text
+$ am provenance --snapshot <am.bin> --event 1
+event 1
+trace_file <am.bin.trace.jsonl>
+traces 1
+ticks 1
+mutations 55
+opened_contradictions 0
+closed_contradictions 0
+causes:
+  Allocate x53
+  ActivationDecay x1
+  RowGeneration x1
+targets:
+  M x1
+  V x48
+  A x1
+  B x1
+  U x1
+  Generation x1
+  Label x1
+  Allocation x1
+```
+
+### Files Changed
+
+- `src/provenance/mod.rs`
+- `src/lib.rs`
+- `src/cli/commands.rs`
+- `tests/track_b_extras.rs`
+- `docs/TRACK_B_README.md`
+- `docs/BUILD_REPORT_NIGHT2.md`
+
+### Deviations
+
+- `am provenance` requires `--snapshot` or `--trace` because there is no global trace database and adding one would violate the local no-database boundary.
+
+### Known Limitations
+
+- Provenance reports trace-level mutation summaries by `event_id`; it does not reconstruct the original EG-1 envelope if the apply report file is not supplied.
+
+### Next
+
+Create final review artifacts and push.

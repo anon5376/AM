@@ -16,6 +16,7 @@ use crate::eval::sweep::{load_grid, run_sweep};
 use crate::ingest::{distill_file, ingest_file, IngestKind};
 use crate::parser::rule::parse_rule_line;
 use crate::percept::PerceptBridge;
+use crate::provenance::provenance_report;
 use crate::storage::snapshot_file::{load_snapshot, save_snapshot};
 use crate::storage::trace_file::append_trace;
 use crate::world::runner::{run_episode, write_episode_files};
@@ -87,6 +88,8 @@ enum Command {
         events: PathBuf,
         #[arg(long)]
         report: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
     },
     Beval {
         #[arg(long)]
@@ -139,6 +142,14 @@ enum Command {
         beval: Vec<PathBuf>,
         #[arg(long)]
         out: PathBuf,
+    },
+    Provenance {
+        #[arg(long)]
+        event: i64,
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+        #[arg(long)]
+        trace: Option<PathBuf>,
     },
     Run {
         #[arg(long)]
@@ -265,6 +276,7 @@ pub fn run() -> Result<()> {
             snapshot,
             events,
             report,
+            dry_run,
         } => {
             let text = fs::read_to_string(&events)
                 .with_context(|| format!("read EG-1 events {}", events.display()))?;
@@ -290,11 +302,13 @@ pub fn run() -> Result<()> {
             let mut state = load_or_new(&snapshot, None)?;
             let mut staging = load_staging(&staging_path)?;
             let mut outcome = apply_parsed_batch(&mut state, &parsed, &mut staging)?;
-            outcome.report.staging_file = Some(staging_path.display().to_string());
-            outcome.report.trace_file = Some(trace_path.display().to_string());
-            save_snapshot(&snapshot, &state)?;
-            save_staging(&staging_path, &staging)?;
-            write_trace_file(&trace_path, &outcome.traces)?;
+            if !dry_run {
+                outcome.report.staging_file = Some(staging_path.display().to_string());
+                outcome.report.trace_file = Some(trace_path.display().to_string());
+                save_snapshot(&snapshot, &state)?;
+                save_staging(&staging_path, &staging)?;
+                write_trace_file(&trace_path, &outcome.traces)?;
+            }
             emit_apply_report(report.as_deref(), &outcome.report)?;
             if outcome.report.has_rejections() {
                 exit_apply_rejection("EG-1 apply completed with rejected events");
@@ -379,6 +393,18 @@ pub fn run() -> Result<()> {
         } => {
             let html = write_dashboard(snapshot, &beval, &out)?;
             println!("dashboard out={} bytes={}", out.display(), html.len());
+        }
+        Command::Provenance {
+            event,
+            snapshot,
+            trace,
+        } => {
+            let trace_path = match (trace, snapshot) {
+                (Some(path), _) => path,
+                (None, Some(snapshot)) => trace_path_for(&snapshot),
+                (None, None) => anyhow::bail!("provenance requires --trace or --snapshot"),
+            };
+            print!("{}", provenance_report(trace_path, event)?);
         }
         Command::Run {
             snapshot,

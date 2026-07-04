@@ -8,5 +8,6 @@ pub mod ingest;
 pub mod llm;
 pub mod parser;
 pub mod percept;
+pub mod provenance;
 pub mod storage;
 pub mod world;
