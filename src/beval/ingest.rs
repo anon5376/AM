@@ -56,7 +56,6 @@ pub fn distill_file(
         let mut value: Value =
             serde_json::from_str(line).with_context(|| format!("parse eg1 line {}", idx + 1))?;
         force_bridge_fields(&mut value, session_id)?;
-        reject_non_opaque_labels(&value)?;
         events.push(value);
     }
     anyhow::ensure!(!events.is_empty(), "eg1 block contains no events");
@@ -64,31 +63,46 @@ pub fn distill_file(
 }
 
 fn cargo_test_events(text: &str, session_id: &str) -> Result<Vec<Value>> {
-    let (passed, failed) = parse_cargo_test_counts(text)?;
-    let total = passed + failed;
-    let success = total > 0 && failed == 0;
-    let confidence = if total == 0 {
-        0.0
-    } else {
-        passed as f32 / total as f32
-    };
-    Ok(vec![assert_event(
-        1,
-        session_id,
-        "test_verified",
-        "cpt_1",
-        &[
-            ("truth_assert", if success { 1.0 } else { -1.0 }),
-            ("completion", if success { 1.0 } else { -1.0 }),
-            ("confidence_proxy", confidence),
-        ],
-    )])
+    let summaries = parse_cargo_test_counts(text)?;
+    summaries
+        .into_iter()
+        .enumerate()
+        .map(|(idx, (passed, failed))| {
+            let total = passed + failed;
+            let pass_ratio = if total == 0 {
+                0.0
+            } else {
+                passed as f32 / total as f32
+            };
+            Ok(assert_event(
+                idx as u64 + 1,
+                session_id,
+                "test_verified",
+                "test_suite",
+                &[
+                    (
+                        "truth_assert",
+                        if failed == 0 && total > 0 { 1.0 } else { -1.0 },
+                    ),
+                    ("completion", pass_ratio.clamp(-1.0, 1.0)),
+                    (
+                        "risk",
+                        (failed as f32 / total.max(1) as f32).clamp(-1.0, 1.0),
+                    ),
+                    ("confidence_proxy", pass_ratio.clamp(-1.0, 1.0)),
+                ],
+            ))
+        })
+        .collect()
 }
 
 fn sweep_csv_events(text: &str, session_id: &str) -> Result<Vec<Value>> {
     let mut lines = text.lines().filter(|line| !line.trim().is_empty());
     let header = lines.next().context("sweep csv is empty")?;
     let headers = split_csv_line(header);
+    let hash_idx = headers
+        .iter()
+        .position(|name| *name == "theta_hash" || *name == "hash");
     let all_pass_idx = headers.iter().position(|name| *name == "all_pass");
     let recall_idx = headers
         .iter()
@@ -96,44 +110,61 @@ fn sweep_csv_events(text: &str, session_id: &str) -> Result<Vec<Value>> {
     let contamination_idx = headers
         .iter()
         .position(|name| *name == "completion_contamination" || *name == "contamination");
-    let mut rows = 0_usize;
-    let mut pass_rows = 0_usize;
-    let mut best_recall = 0.0_f32;
-    let mut best_contamination = 1.0_f32;
+    let margin_idx = headers
+        .iter()
+        .position(|name| *name == "recall_margin_095" || *name == "margin");
+    let mut best: Option<SweepRow> = None;
     for line in lines {
         let fields = split_csv_line(line);
-        rows += 1;
-        if let Some(idx) = all_pass_idx {
-            if fields
-                .get(idx)
-                .is_some_and(|value| matches!(*value, "true" | "1" | "pass"))
-            {
-                pass_rows += 1;
-            }
-        }
-        if let Some(idx) = recall_idx {
-            if let Some(value) = fields.get(idx).and_then(|value| value.parse::<f32>().ok()) {
-                best_recall = best_recall.max(value);
-            }
-        }
-        if let Some(idx) = contamination_idx {
-            if let Some(value) = fields.get(idx).and_then(|value| value.parse::<f32>().ok()) {
-                best_contamination = best_contamination.min(value);
-            }
+        let hash = hash_idx
+            .and_then(|idx| fields.get(idx))
+            .copied()
+            .filter(|value| !value.is_empty())
+            .context("sweep csv row missing theta_hash/hash")?;
+        let row = SweepRow {
+            hash: hash.to_string(),
+            all_pass: all_pass_idx
+                .and_then(|idx| fields.get(idx))
+                .is_some_and(|value| matches!(*value, "true" | "1" | "pass")),
+            recall: parse_optional_f32(&fields, recall_idx).unwrap_or(0.0),
+            contamination: parse_optional_f32(&fields, contamination_idx).unwrap_or(1.0),
+            margin: parse_optional_f32(&fields, margin_idx).unwrap_or(0.0),
+        };
+        if row.all_pass {
+            best = match best {
+                Some(current) if current.margin > row.margin => Some(current),
+                Some(current) if current.margin == row.margin && current.recall > row.recall => {
+                    Some(current)
+                }
+                Some(current)
+                    if current.margin == row.margin
+                        && current.recall == row.recall
+                        && current.hash <= row.hash =>
+                {
+                    Some(current)
+                }
+                _ => Some(row),
+            };
+        } else if best.is_none() {
+            best = Some(row);
         }
     }
-    anyhow::ensure!(rows > 0, "sweep csv has no data rows");
-    let pass_ratio = pass_rows as f32 / rows as f32;
+    let best = best.context("sweep csv has no data rows")?;
+    let hash8 = best.hash.chars().take(8).collect::<String>();
+    anyhow::ensure!(
+        hash8.len() == 8,
+        "sweep theta hash must have at least 8 chars"
+    );
     Ok(vec![assert_event(
         1,
         session_id,
         "test_verified",
-        "cpt_2",
+        &format!("sweep_{hash8}"),
         &[
-            ("truth_assert", if pass_rows > 0 { 1.0 } else { -1.0 }),
-            ("completion", best_recall.max(pass_ratio).clamp(0.0, 1.0)),
-            ("risk", best_contamination.clamp(0.0, 1.0)),
-            ("confidence_proxy", pass_ratio.clamp(0.0, 1.0)),
+            ("truth_assert", if best.all_pass { 1.0 } else { -1.0 }),
+            ("completion", best.recall.clamp(-1.0, 1.0)),
+            ("risk", best.contamination.clamp(-1.0, 1.0)),
+            ("confidence_proxy", best.margin.clamp(-1.0, 1.0)),
         ],
     )])
 }
@@ -144,27 +175,34 @@ fn world_run_events(text: &str, session_id: &str) -> Result<Vec<Value>> {
     let completed = text.contains("termination=goal")
         || text.contains("\"termination\":\"goal\"")
         || text.contains("\"termination\":\"success\"");
+    let failed = text.contains("termination=death") || text.contains("\"termination\":\"death\"");
     Ok(vec![assert_event(
         1,
         session_id,
         "test_verified",
-        "cpt_3",
+        "world_run",
         &[
-            ("truth_assert", 1.0),
-            ("completion", if completed { 1.0 } else { 0.5 }),
+            ("truth_assert", if failed { -1.0 } else { 1.0 }),
+            ("completion", if completed { 1.0 } else { -1.0 }),
+            ("risk", if failed { 1.0 } else { 0.0 }),
             ("confidence_proxy", 1.0),
         ],
     )])
 }
 
-fn parse_cargo_test_counts(text: &str) -> Result<(usize, usize)> {
+fn parse_cargo_test_counts(text: &str) -> Result<Vec<(usize, usize)>> {
+    let mut out = Vec::new();
     for line in text.lines().rev() {
         if !line.contains("test result:") {
             continue;
         }
         let passed = number_before(line, "passed").unwrap_or(0);
         let failed = number_before(line, "failed").unwrap_or(0);
-        return Ok((passed, failed));
+        out.push((passed, failed));
+    }
+    out.reverse();
+    if !out.is_empty() {
+        return Ok(out);
     }
     anyhow::bail!("cargo-test input has no `test result:` summary")
 }
@@ -176,6 +214,19 @@ fn number_before(line: &str, marker: &str) -> Option<usize> {
 
 fn split_csv_line(line: &str) -> Vec<&str> {
     line.split(',').map(str::trim).collect()
+}
+
+fn parse_optional_f32(fields: &[&str], idx: Option<usize>) -> Option<f32> {
+    fields.get(idx?)?.parse().ok()
+}
+
+#[derive(Clone, Debug)]
+struct SweepRow {
+    hash: String,
+    all_pass: bool,
+    recall: f32,
+    contamination: f32,
+    margin: f32,
 }
 
 fn extract_one_eg1_block(text: &str) -> Result<String> {
@@ -214,33 +265,6 @@ fn force_bridge_fields(value: &mut Value, session_id: &str) -> Result<()> {
     );
     object.insert("source".to_string(), Value::String("llm_claim".to_string()));
     Ok(())
-}
-
-fn reject_non_opaque_labels(value: &Value) -> Result<()> {
-    let object = value
-        .as_object()
-        .context("eg1 line must be a JSON object")?;
-    let Some(args) = object.get("args").and_then(Value::as_object) else {
-        return Ok(());
-    };
-    for field in ["concept", "a", "b"] {
-        if let Some(label) = args.get(field).and_then(Value::as_str) {
-            anyhow::ensure!(
-                is_opaque_label(label),
-                "distill label `{label}` is not opaque"
-            );
-        }
-    }
-    Ok(())
-}
-
-fn is_opaque_label(label: &str) -> bool {
-    for prefix in ["cpt_", "trk_", "loc_"] {
-        if let Some(rest) = label.strip_prefix(prefix) {
-            return !rest.is_empty() && rest.bytes().all(|byte| byte.is_ascii_digit());
-        }
-    }
-    false
 }
 
 fn write_validated_events(events: Vec<Value>, events_out: impl AsRef<Path>) -> Result<String> {

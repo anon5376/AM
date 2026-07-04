@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const SNAPSHOT_FORMAT_VERSION: u32 = 4;
+pub const SNAPSHOT_FORMAT_VERSION: u32 = 5;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Link {
@@ -20,6 +20,13 @@ pub struct WriteEvidence {
     pub tick: i64,
     pub sign: i8,
     pub delta: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecentMutationCause {
+    pub tick: i64,
+    pub event_id: i64,
+    pub cause: Cause,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -57,6 +64,7 @@ pub struct AmState {
     pub goals: Vec<RowRef>,
     pub open_contradictions: Vec<OpenContradiction>,
     pub recent_writes: BTreeMap<(RowRef, usize), Vec<WriteEvidence>>,
+    pub recent_mutation_causes: Vec<RecentMutationCause>,
     pub free_list: Vec<usize>,
 }
 
@@ -85,6 +93,7 @@ impl AmState {
             goals: Vec::new(),
             open_contradictions: Vec::new(),
             recent_writes: BTreeMap::new(),
+            recent_mutation_causes: Vec::new(),
             free_list,
         })
     }
@@ -450,6 +459,20 @@ impl AmState {
         if history.len() > keep {
             let drop_count = history.len() - keep;
             history.drain(0..drop_count);
+        }
+    }
+
+    pub fn record_recent_mutation_causes(&mut self, trace: &StepTrace) {
+        self.recent_mutation_causes
+            .extend(trace.mutations.iter().map(|mutation| RecentMutationCause {
+                tick: trace.tick,
+                event_id: trace.event_id,
+                cause: mutation.cause,
+            }));
+        let keep = 200;
+        if self.recent_mutation_causes.len() > keep {
+            let drop_count = self.recent_mutation_causes.len() - keep;
+            self.recent_mutation_causes.drain(0..drop_count);
         }
     }
 

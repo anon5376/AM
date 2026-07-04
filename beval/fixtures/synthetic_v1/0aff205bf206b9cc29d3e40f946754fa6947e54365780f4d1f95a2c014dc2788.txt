@@ -1,1 +1,1 @@
-ANSWER: Use cargo fmt, cargo clippy -- -D warnings, and cargo test; cite 51 tests passed.
+ANSWER: cargo fmt && cargo clippy -- -D warnings && cargo test; B01 reported 51 tests passed.

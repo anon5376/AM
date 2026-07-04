@@ -47,13 +47,13 @@ am provenance --trace am.bin.trace.jsonl --event 1
 Render a static dashboard:
 
 ```text
-am dashboard --snapshot am.bin --beval b2.json --out dashboard.html
+am dashboard --snapshot am.bin --beval b2.json --trace am.bin.trace.jsonl --report apply.json --out dashboard.html
 ```
 
 ## Boundaries
 
 - `llm_claim` events never mutate AM directly. They stage, then commit only after `user` or `test_verified` corroboration through EG-1.
-- Distill rejects missing, duplicate, malformed, or non-opaque `eg1` blocks before writing any output.
+- Distill rejects missing, duplicate, malformed, or non-validating `eg1` blocks before writing any output.
 - Ingest stores compact verification summaries, not raw test/world/sweep text.
 - Dashboard output is read-only, self-contained HTML. It is inspection, not evidence by itself.
 - No database, vector store, RAG core, network runtime loop, or live LLM path is used by these commands.

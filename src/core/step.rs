@@ -40,6 +40,7 @@ pub fn step_result(state: &mut AmState, event: &Event) -> Result<StepTrace> {
     update_links(state, &event, &settle_result.active_set, &mut trace)?;
     update_contradictions(state, &written_cells, &mut trace);
     decay_and_forget(state, &mut trace);
+    state.record_recent_mutation_causes(&trace);
     Ok(trace)
 }
 

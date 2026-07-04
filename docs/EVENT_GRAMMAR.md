@@ -96,7 +96,7 @@ The staging sidecar is bridge-owned and lives beside the snapshot:
 <snapshot>.staging
 ```
 
-It is versioned, sorted before serialization, and byte-stable for roundtrip hashing. The core snapshot format remains v4.
+It is versioned, sorted before serialization, and byte-stable for roundtrip hashing. B01 did not change the core snapshot schema; the current core snapshot format is v5 after the later B03 inspection-buffer addition.
 
 `llm_claim` events never touch AM state directly.
 

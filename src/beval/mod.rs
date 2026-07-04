@@ -1,5 +1,7 @@
 pub mod compile;
 pub mod corpus;
+pub mod distill;
+pub mod ingest;
 pub mod prompt;
 pub mod results;
 pub mod scoring;
