@@ -29,17 +29,24 @@ th { color:var(--muted); font-size:12px; font-weight:700; background:#f1f4f6; }
 <main>
 <h1>AM Dashboard</h1>
 <section class="summary" id="summary"></section>
+<h2>Compiled Context</h2>
+<pre id="compiled-context"></pre>
 <h2>Active Rows</h2>
 <div id="active"></div>
 <h2>Strong Links</h2>
 <div id="links"></div>
 <h2>Open Contradictions</h2>
 <div id="contradictions"></div>
+<h2>Staging Queue</h2>
+<div id="staging"></div>
 <h2>B-Eval Results</h2>
 <div id="beval"></div>
+<h2>Provenance</h2>
+<div id="provenance"></div>
 </main>
 <script id="am-data" type="application/json">{
   "schema": "AM-DASHBOARD-1",
+  "compiled_context": "STATE:\ntheta_hash 6905c5f8beede6bd3dfd9fc403626eafb433488291667610d11f0db54f23520c\ntick 7\nrow_count 2\nACTIVE:\ncpt_1 [truth_assert +0.73] cert 0.82\ncpt_2 [project_relevance +1.00 implementation_relevance +0.80 confidence_proxy +0.70] cert 0.84\nLINKS:\ncpt_1 —0.30→ cpt_2\nCONTRADICTIONS:\ncpt_1 truth_assert (min-axis cert 0.47)\nLOW-CERT:\n(none)\nGOALS:\ncpt_2\nRECENT:\nActivationDecay x1\nAllocate x9\nBaselineDecay x5\nGoalPush x1\nLinkHint x2\nSettle x2\nDIRECTIVE:\nOPEN CONTRADICTIONS EXIST. Do not present affected concepts as settled. Ask for a test or propose disambiguation.\n",
   "snapshot": {
     "theta_hash": "6905c5f8beede6bd3dfd9fc403626eafb433488291667610d11f0db54f23520c",
     "tick": 7,
@@ -96,13 +103,28 @@ th { color:var(--muted); font-size:12px; font-weight:700; background:#f1f4f6; }
       "cpt_2"
     ]
   },
+  "staging": {
+    "applied_event_count": 7,
+    "entries": [
+      {
+        "id": 8,
+        "source": "llm_claim",
+        "verb": "assert",
+        "summary": "cpt_3 confidence_proxy=+1.00",
+        "age": 0,
+        "corroboration_template": "{\"grammar\":\"EG-1\"}\n{\"args\":{\"axes\":[{\"axis\":\"confidence_proxy\",\"value\":1.0}],\"concept\":\"cpt_3\"},\"id\":9,\"session_id\":\"dash\",\"source\":\"test_verified\",\"verb\":\"assert\"}\n"
+      }
+    ]
+  },
   "beval": [
     {
       "path": "tests/golden/b05_beval.json",
       "lane": "b2",
+      "transport": "replay",
       "evaluated": 29,
       "skipped": 0,
       "mean_context_tokens": 533.0,
+      "total_context_tokens": 15457,
       "categories": [
         {
           "category": "stage_accuracy",
@@ -124,23 +146,98 @@ th { color:var(--muted); font-size:12px; font-weight:700; background:#f1f4f6; }
         }
       ]
     }
+  ],
+  "provenance": [
+    {
+      "event_id": 1,
+      "tick": 1,
+      "mutations": 55,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 2,
+      "tick": 2,
+      "mutations": 5,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 3,
+      "tick": 3,
+      "mutations": 5,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 4,
+      "tick": 4,
+      "mutations": 6,
+      "opened": 1,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 5,
+      "tick": 5,
+      "mutations": 59,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 6,
+      "tick": 6,
+      "mutations": 5,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    },
+    {
+      "event_id": 7,
+      "tick": 7,
+      "mutations": 3,
+      "opened": 0,
+      "closed": 0,
+      "actions": [
+        "applied:user"
+      ]
+    }
   ]
 }</script>
 <script>
 const data = JSON.parse(document.getElementById('am-data').textContent);
 const esc = value => String(value).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 const metric = (name, value) => `<div class="metric"><b>${esc(name)}</b><span>${esc(value)}</span></div>`;
+const templateHref = value => `data:text/plain;charset=utf-8,${encodeURIComponent(value)}`;
 document.getElementById('summary').innerHTML = [
   metric('theta hash', data.snapshot.theta_hash.slice(0, 12)),
   metric('tick', data.snapshot.tick),
   metric('rows', data.snapshot.row_count),
   metric('open contradictions', data.snapshot.contradictions.length),
+  metric('staged claims', data.staging.entries.length),
   metric('beval reports', data.beval.length)
 ].join('');
 function table(headers, rows, empty) {
   if (!rows.length) return `<p class="empty">${esc(empty)}</p>`;
   return `<table><thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
 }
+document.getElementById('compiled-context').textContent = data.compiled_context;
 document.getElementById('active').innerHTML = table(['label','a','b','cert','axes'], data.snapshot.active_rows.map(row =>
   `<tr><td>${esc(row.label)}</td><td>${row.activation.toFixed(2)}</td><td>${row.baseline.toFixed(2)}</td><td>${row.certainty.toFixed(2)}</td><td>${row.axes.map(axis => `<span class="axis">${esc(axis.name)} ${axis.value >= 0 ? '+' : ''}${axis.value.toFixed(2)}</span>`).join('')}</td></tr>`
 ), 'no allocated rows');
@@ -150,9 +247,15 @@ document.getElementById('links').innerHTML = table(['source','weight','target'],
 document.getElementById('contradictions').innerHTML = table(['label','axis','min-axis cert'], data.snapshot.contradictions.map(item =>
   `<tr><td>${esc(item.label)}</td><td>${esc(item.axis)}</td><td class="warn">${item.min_axis_cert.toFixed(2)}</td></tr>`
 ), 'no open contradictions');
-document.getElementById('beval').innerHTML = table(['lane','evaluated','skipped','mean ctx','categories'], data.beval.map(report =>
-  `<tr><td>${esc(report.lane)}</td><td>${report.evaluated}</td><td>${report.skipped}</td><td>${report.mean_context_tokens.toFixed(1)}</td><td>${report.categories.map(cat => `<span class="${cat.accuracy === 1 ? 'good' : cat.accuracy === 0 ? 'bad' : 'warn'}">${esc(cat.category)} ${cat.matched}/${cat.total}</span>`).join(' ')}</td></tr>`
+document.getElementById('staging').innerHTML = table(['id','source','verb','age','summary','corroboration'], data.staging.entries.map(entry =>
+  `<tr><td>${entry.id}</td><td>${esc(entry.source)}</td><td>${esc(entry.verb)}</td><td>${entry.age}</td><td>${esc(entry.summary)}</td><td><a download="corroborate_${entry.id}.eg1" href="${templateHref(entry.corroboration_template)}">download</a></td></tr>`
+), 'no staged claims');
+document.getElementById('beval').innerHTML = table(['lane','transport','evaluated','skipped','mean ctx','total ctx','categories'], data.beval.map(report =>
+  `<tr><td>${esc(report.lane)}</td><td>${esc(report.transport)}</td><td>${report.evaluated}</td><td>${report.skipped}</td><td>${report.mean_context_tokens.toFixed(1)}</td><td>${report.total_context_tokens}</td><td>${report.categories.map(cat => `<span class="${cat.accuracy === 1 ? 'good' : cat.accuracy === 0 ? 'bad' : 'warn'}">${esc(cat.category)} ${cat.matched}/${cat.total} ${(cat.accuracy * 100).toFixed(0)}%</span>`).join(' ')}</td></tr>`
 ), 'no beval results supplied');
+document.getElementById('provenance').innerHTML = table(['event','tick','mutations','opened','closed','apply actions'], data.provenance.map(row =>
+  `<tr><td>${row.event_id}</td><td>${row.tick}</td><td>${row.mutations}</td><td>${row.opened}</td><td>${row.closed}</td><td>${row.actions.map(esc).join(', ') || '<span class="empty">none</span>'}</td></tr>`
+), 'no trace events supplied');
 </script>
 </body>
 </html>

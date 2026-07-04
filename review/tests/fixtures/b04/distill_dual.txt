@@ -1,0 +1,6 @@
+```eg1
+{"id":1,"verb":"cue","args":{"concept":"test_suite","strength":0.8}}
+```
+```eg1
+{"id":2,"verb":"cue","args":{"concept":"test_suite","strength":0.8}}
+```

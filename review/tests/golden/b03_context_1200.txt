@@ -43,6 +43,6 @@ LOW-CERT:
 GOALS:
 cpt_6
 RECENT:
-write x20
+BaselineDecay x20
 DIRECTIVE:
 OPEN CONTRADICTIONS EXIST. Do not present affected concepts as settled. Ask for a test or propose disambiguation.

@@ -1,1 +1,0 @@
-ANSWER: tests/drift_check.rs guards B-track architecture drift.

@@ -1,1 +1,0 @@
-ANSWER: del_w=0.0

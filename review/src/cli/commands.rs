@@ -3,6 +3,8 @@ use crate::apply::{
     staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
 };
 use crate::beval::compile::{write_compiled_context, DEFAULT_CONTEXT_BUDGET};
+use crate::beval::distill::distill_file;
+use crate::beval::ingest::{ingest_file, IngestKind};
 use crate::beval::{run_beval, BevalConfig, Lane, TransportKind};
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
@@ -13,7 +15,6 @@ use crate::core::step::step_result;
 use crate::core::theta::Theta;
 use crate::dashboard::write_dashboard;
 use crate::eval::sweep::{load_grid, run_sweep};
-use crate::ingest::{distill_file, ingest_file, IngestKind};
 use crate::parser::rule::parse_rule_line;
 use crate::percept::PerceptBridge;
 use crate::provenance::provenance_report;
@@ -140,6 +141,10 @@ enum Command {
         snapshot: PathBuf,
         #[arg(long)]
         beval: Vec<PathBuf>,
+        #[arg(long)]
+        trace: Vec<PathBuf>,
+        #[arg(long)]
+        report: Vec<PathBuf>,
         #[arg(long)]
         out: PathBuf,
     },
@@ -389,9 +394,11 @@ pub fn run() -> Result<()> {
         Command::Dashboard {
             snapshot,
             beval,
+            trace,
+            report,
             out,
         } => {
-            let html = write_dashboard(snapshot, &beval, &out)?;
+            let html = write_dashboard(snapshot, &beval, &trace, &report, &out)?;
             println!("dashboard out={} bytes={}", out.display(), html.len());
         }
         Command::Provenance {

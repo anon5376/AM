@@ -1,0 +1,3 @@
+theta_hash,all_pass,completion_recall,completion_contamination,recall_margin_095
+11111111aaaaaaaa,false,0.2,0.3,0.0
+abcdef1234567890,true,0.95,0.05,0.8

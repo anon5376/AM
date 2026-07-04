@@ -1,7 +1,7 @@
 use crate::beval::prompt::token_count;
 use crate::core::axes::axis_name;
 use crate::core::inspect::axis_certainty;
-use crate::core::state::{AmState, ContradictionStatus, WriteEvidence};
+use crate::core::state::{AmState, ContradictionStatus};
 use crate::storage::snapshot_file::load_snapshot;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
@@ -234,23 +234,14 @@ fn goal_entries(state: &AmState) -> Vec<String> {
 }
 
 fn recent_entries(state: &AmState) -> Vec<String> {
-    let mut writes = state
-        .recent_writes
-        .iter()
-        .flat_map(|((_, _), history)| history.iter())
-        .collect::<Vec<&WriteEvidence>>();
-    writes.sort_by(|left, right| {
-        right
-            .tick
-            .cmp(&left.tick)
-            .then_with(|| right.event_id.cmp(&left.event_id))
-    });
-    let count = writes.into_iter().take(20).count();
-    if count == 0 {
-        Vec::new()
-    } else {
-        vec![format!("write x{count}")]
+    let mut counts = BTreeMap::<String, usize>::new();
+    for item in state.recent_mutation_causes.iter().rev().take(20) {
+        *counts.entry(format!("{:?}", item.cause)).or_insert(0) += 1;
     }
+    counts
+        .into_iter()
+        .map(|(cause, count)| format!("{cause} x{count}"))
+        .collect()
 }
 
 fn directive_section(state: &AmState) -> Option<Section> {

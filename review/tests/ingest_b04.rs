@@ -1,4 +1,7 @@
 use am001::apply::{load_staging, parse_batch_text, staging_path_for, ApplyAction, EventSource};
+use am001::core::axes::axis_index;
+use am001::core::event::ConceptRef;
+use am001::storage::snapshot_file::load_snapshot;
 use serde_json::Value;
 use std::fs;
 use std::process::Command;
@@ -10,29 +13,33 @@ fn ingest_all_kinds_emit_valid_test_verified_events() {
     let cases = [
         (
             "cargo-test",
-            "running 1 test\ntest raw_name_is_not_stored ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
+            "tests/fixtures/b04/cargo_test.txt",
+            "test_suite",
+            2,
         ),
         (
             "sweep-csv",
-            "theta_hash,all_pass,completion_recall,completion_contamination\nabc,false,0.2,0.3\ndef,true,1.0,0.0\n",
+            "tests/fixtures/b04/sweep.csv",
+            "sweep_abcdef12",
+            1,
         ),
         (
             "world-run",
-            "world-run actions=4 ran=4 termination=goal obs=/tmp/obs.jsonl trace=/tmp/trace.jsonl\n",
+            "tests/fixtures/b04/world_run.txt",
+            "world_run",
+            1,
         ),
     ];
 
-    for (kind, input_text) in cases {
-        let input = dir.path().join(format!("{kind}.txt"));
+    for (kind, fixture, concept, expected_events) in cases {
         let events = dir.path().join(format!("{kind}.jsonl"));
-        fs::write(&input, input_text).unwrap();
         let output = Command::new(env!("CARGO_BIN_EXE_am"))
             .args([
                 "ingest",
                 "--kind",
                 kind,
                 "--input",
-                input.to_str().unwrap(),
+                fixture,
                 "--session",
                 "s_b04",
                 "--events-out",
@@ -44,9 +51,28 @@ fn ingest_all_kinds_emit_valid_test_verified_events() {
         let text = fs::read_to_string(&events).unwrap();
         let parsed = parse_batch_text(&text).unwrap();
         assert!(parsed.rejections.is_empty());
-        assert_eq!(parsed.events.len(), 1);
-        assert_eq!(parsed.events[0].source, EventSource::TestVerified);
-        assert_eq!(parsed.events[0].session_id, "s_b04");
+        assert_eq!(parsed.events.len(), expected_events);
+        for event in &parsed.events {
+            assert_eq!(event.source, EventSource::TestVerified);
+            assert_eq!(event.session_id, "s_b04");
+            match &event.args {
+                am001::apply::EgArgs::Assert {
+                    concept: label,
+                    axes,
+                } => {
+                    assert_eq!(label, concept);
+                    for axis in axes {
+                        assert!(
+                            (-1.0..=1.0).contains(&axis.value),
+                            "{} value {} outside [-1,1]",
+                            axis.axis,
+                            axis.value
+                        );
+                    }
+                }
+                other => panic!("unexpected ingest args: {other:?}"),
+            }
+        }
         assert!(
             !text.contains("raw_name_is_not_stored"),
             "raw cargo-test text leaked into EG-1"
@@ -55,24 +81,43 @@ fn ingest_all_kinds_emit_valid_test_verified_events() {
 }
 
 #[test]
+fn ingest_rejects_malformed_inputs_without_partial_output() {
+    let dir = tempdir().unwrap();
+    for (kind, fixture) in [
+        ("cargo-test", "tests/fixtures/b04/cargo_bad.txt"),
+        ("sweep-csv", "tests/fixtures/b04/sweep_bad.csv"),
+        ("world-run", "tests/fixtures/b04/world_run_bad.txt"),
+    ] {
+        let events = dir.path().join(format!("{kind}.jsonl"));
+        let output = Command::new(env!("CARGO_BIN_EXE_am"))
+            .args([
+                "ingest",
+                "--kind",
+                kind,
+                "--input",
+                fixture,
+                "--session",
+                "s_bad",
+                "--events-out",
+                events.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{kind}");
+        assert!(!events.exists(), "{kind} wrote partial output");
+        assert!(stderr(&output).starts_with("Error: ingest rejected:"));
+    }
+}
+
+#[test]
 fn distill_extracts_one_fence_forces_source_and_rejects_bad_inputs() {
     let dir = tempdir().unwrap();
-    let input = dir.path().join("llm.txt");
     let events = dir.path().join("claims.jsonl");
-    fs::write(
-        &input,
-        r#"ignored prose
-```eg1
-{"id":7,"session_id":"wrong","source":"user","verb":"assert","args":{"concept":"cpt_1","axes":[{"axis":"truth_assert","value":1.0}]}}
-```
-"#,
-    )
-    .unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_am"))
         .args([
             "distill",
             "--input",
-            input.to_str().unwrap(),
+            "tests/fixtures/b04/distill_valid.txt",
             "--session",
             "s_distill",
             "--events-out",
@@ -87,25 +132,19 @@ fn distill_extracts_one_fence_forces_source_and_rejects_bad_inputs() {
     assert_eq!(parsed.events[0].source, EventSource::LlmClaim);
     assert_eq!(parsed.events[0].session_id, "s_distill");
 
-    for (name, body) in [
-        ("missing.txt", "no fenced block"),
-        (
-            "dual.txt",
-            "```eg1\n{\"id\":1,\"verb\":\"cue\",\"args\":{\"concept\":\"cpt_1\",\"strength\":0.8}}\n```\n```eg1\n{\"id\":2,\"verb\":\"cue\",\"args\":{\"concept\":\"cpt_2\",\"strength\":0.8}}\n```",
-        ),
-        (
-            "raw_label.txt",
-            "```eg1\n{\"id\":1,\"verb\":\"assert\",\"args\":{\"concept\":\"rust\",\"axes\":[{\"axis\":\"truth_assert\",\"value\":1.0}]}}\n```",
-        ),
+    for fixture in [
+        "tests/fixtures/b04/distill_missing.txt",
+        "tests/fixtures/b04/distill_dual.txt",
+        "tests/fixtures/b04/distill_invalid.txt",
     ] {
-        let bad_input = dir.path().join(name);
-        let bad_out = dir.path().join(format!("{name}.jsonl"));
-        fs::write(&bad_input, body).unwrap();
+        let bad_out = dir
+            .path()
+            .join(format!("{}.jsonl", fixture.replace('/', "_")));
         let output = Command::new(env!("CARGO_BIN_EXE_am"))
             .args([
                 "distill",
                 "--input",
-                bad_input.to_str().unwrap(),
+                fixture,
                 "--session",
                 "s_distill",
                 "--events-out",
@@ -113,8 +152,8 @@ fn distill_extracts_one_fence_forces_source_and_rejects_bad_inputs() {
             ])
             .output()
             .unwrap();
-        assert!(!output.status.success(), "{name}");
-        assert!(!bad_out.exists(), "{name} wrote a partial output");
+        assert!(!output.status.success(), "{fixture}");
+        assert!(!bad_out.exists(), "{fixture} wrote a partial output");
         assert!(stderr(&output).starts_with("Error: distill rejected:"));
     }
 }
@@ -137,7 +176,7 @@ fn distilled_claim_stages_and_ingested_test_verified_event_commits_it() {
     ]));
     fs::write(
         &llm_input,
-        "```eg1\n{\"id\":1,\"verb\":\"assert\",\"args\":{\"concept\":\"cpt_1\",\"axes\":[{\"axis\":\"truth_assert\",\"value\":1.0}]}}\n```\n",
+        "```eg1\n{\"id\":1,\"verb\":\"assert\",\"args\":{\"concept\":\"test_suite\",\"axes\":[{\"axis\":\"truth_assert\",\"value\":1.0}]}}\n```\n",
     )
     .unwrap();
     run_ok(Command::new(env!("CARGO_BIN_EXE_am")).args([
@@ -198,6 +237,32 @@ fn distilled_claim_stages_and_ingested_test_verified_event_commits_it() {
     assert!(committed);
     let staging = load_staging(&staging_path_for(&snapshot)).unwrap();
     assert!(staging.entries.is_empty());
+    let state = load_snapshot(&snapshot).unwrap();
+    let row = state
+        .resolve_existing(&ConceptRef::Label("test_suite".to_string()))
+        .unwrap();
+    assert!(state.m_get(row, axis_index("truth_assert").unwrap()) > 0.0);
+}
+
+#[test]
+fn ingest_and_distill_outputs_are_deterministic() {
+    let dir = tempdir().unwrap();
+    let left = dir.path().join("left.jsonl");
+    let right = dir.path().join("right.jsonl");
+    for out in [&left, &right] {
+        run_ok(Command::new(env!("CARGO_BIN_EXE_am")).args([
+            "ingest",
+            "--kind",
+            "sweep-csv",
+            "--input",
+            "tests/fixtures/b04/sweep.csv",
+            "--session",
+            "s_det",
+            "--events-out",
+            out.to_str().unwrap(),
+        ]));
+    }
+    assert_eq!(fs::read(&left).unwrap(), fs::read(&right).unwrap());
 }
 
 fn run_ok(command: &mut Command) {

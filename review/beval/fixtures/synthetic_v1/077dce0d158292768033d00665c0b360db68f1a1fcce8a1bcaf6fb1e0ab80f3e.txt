@@ -1,0 +1,1 @@
+ANSWER: docs/EVENT_GRAMMAR.md defines EG-1 for reviewers.

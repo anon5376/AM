@@ -1,0 +1,1 @@
+world-run actions=4 ran=4 termination=goal obs=/tmp/obs.jsonl trace=/tmp/trace.jsonl

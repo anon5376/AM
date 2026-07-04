@@ -48,6 +48,7 @@ B03 context compiler.
 
 - Added `src/beval/compile.rs` and `am compile-context --snapshot <p> [--budget 1200] --out <f>`.
 - Compiled context sections render in fixed order: `STATE`, `ACTIVE`, `LINKS`, `CONTRADICTIONS`, `LOW-CERT`, `GOALS`, `RECENT`, plus the mandatory contradiction directive when open contradictions exist.
+- Added snapshot-resident `recent_mutation_causes` inspection state and bumped the core snapshot format to v5 so `RECENT` is the last 20 mutation causes, deduplicated and counted, without reading trace logs.
 - Budgeting uses the pinned char/4 token estimate and removes whole entries in priority order: `RECENT`, `LOW-CERT`, `LINKS`, `ACTIVE`; fixed sections are never truncated.
 - Wired lane B2 to compiled snapshot context. B2 now requires `--snapshot`; it no longer skips as `LaneUnavailable`.
 - Added B03 goldens at 1200 and 400 tokens and added 29 B2 synthetic replay fixtures over the frozen B02 corpus.
@@ -112,7 +113,7 @@ total_context_tokens=15457
 
 ```text
 $ shasum -a 256 tests/golden/b03_context_1200.txt tests/golden/b03_context_400.txt beval/fixtures/synthetic_v1/*.txt | shasum -a 256
-9521a8662d7d8b953b86a0ad50519ac11246df97bb05bae7db4173cad24ba27b  -
+30da77c3438f4770c88f86f262e22d118aa779c6f8d9471db24f22ea383f169e  -
 ```
 
 ### Files Changed
@@ -121,16 +122,18 @@ $ shasum -a 256 tests/golden/b03_context_1200.txt tests/golden/b03_context_400.t
 - `src/beval/mod.rs`
 - `src/beval/prompt.rs`
 - `src/cli/commands.rs`
+- `src/core/snapshot.rs`
+- `src/core/state.rs`
+- `src/core/step.rs`
 - `tests/beval_b02.rs`
 - `tests/beval_b03.rs`
 - `tests/golden/b03_context_1200.txt`
 - `tests/golden/b03_context_400.txt`
-- `beval/fixtures/synthetic_v1/*.txt` (29 B2 prompt fixtures)
+- `beval/fixtures/synthetic_v1/*.txt` (78 frozen replay prompt fixtures total)
 - `docs/BUILD_REPORT_NIGHT2.md`
 
 ### Deviations
 
-- `RECENT` is compiled from snapshot-resident `recent_writes` evidence as a deduplicated write-cause count (`write xN`). The snapshot does not contain the full external trace log or complete per-step mutation-cause history, and B03 did not add trace-memory state to the core.
 - The frozen B02 corpus/matchers were not edited. This means `stale_b2_ready` still tests the B02-era stale claim by design while B03 proves the new B2 lane separately.
 
 ### Known Limitations
@@ -145,22 +148,25 @@ B04 ingest/distill.
 
 ### Workstream
 
-- Added `src/ingest/mod.rs`.
+- Added B04 implementation under `src/beval/ingest.rs`, with `src/beval/distill.rs` as the named distill entrypoint.
 - Added `am ingest --kind cargo-test|sweep-csv|world-run --input <f> --session <id> --events-out <f.jsonl>`.
 - Added `am distill --input <llm_output.txt> --session <id> --events-out <f.jsonl>`.
-- Ingest outputs `test_verified` EG-1 events only, using opaque concept labels and compact metric axes.
-- Distill extracts exactly one fenced `eg1` JSONL block without a header, forces `session_id` and `source=llm_claim`, rejects non-opaque labels, validates the generated EG-1 through the existing B01 parser, and writes nothing on rejection.
+- Ingest outputs `test_verified` EG-1 events only, using the pinned B04 concepts `test_suite`, `sweep_<hash8>`, and `world_run` with values constrained to `[-1, 1]`.
+- Added `docs/INGEST_AXIS_MAP.md` for cargo-test, sweep-csv, and world-run mappings onto existing axes.
+- Distill extracts exactly one fenced `eg1` JSONL block without a header, forces `session_id` and `source=llm_claim`, validates the generated EG-1 through the existing B01 parser, and writes nothing on rejection.
 - Added end-to-end coverage proving a distilled `llm_claim` assertion stages first and commits only after a `test_verified` cargo-test ingest event corroborates the same concept/axis sign.
 
 ### Commands
 
 ```text
 $ cargo test --test ingest_b04 -- --nocapture
-running 3 tests
+running 5 tests
+test ingest_and_distill_outputs_are_deterministic ... ok
+test ingest_rejects_malformed_inputs_without_partial_output ... ok
 test ingest_all_kinds_emit_valid_test_verified_events ... ok
 test distill_extracts_one_fence_forces_source_and_rejects_bad_inputs ... ok
 test distilled_claim_stages_and_ingested_test_verified_event_commits_it ... ok
-test result: ok. 3 passed; 0 failed
+test result: ok. 5 passed; 0 failed
 ```
 
 ```text
@@ -182,14 +188,14 @@ Distilled claim:
 
 ```json
 {"grammar":"EG-1"}
-{"args":{"axes":[{"axis":"truth_assert","value":1.0}],"concept":"cpt_1"},"id":1,"session_id":"s_demo","source":"llm_claim","verb":"assert"}
+{"args":{"axes":[{"axis":"truth_assert","value":1.0}],"concept":"test_suite"},"id":1,"session_id":"s_demo","source":"llm_claim","verb":"assert"}
 ```
 
 Verified ingest:
 
 ```json
 {"grammar":"EG-1"}
-{"args":{"axes":[{"axis":"truth_assert","value":1.0},{"axis":"completion","value":1.0},{"axis":"confidence_proxy","value":1.0}],"concept":"cpt_1"},"id":1,"session_id":"s_demo","source":"test_verified","verb":"assert"}
+{"args":{"axes":[{"axis":"truth_assert","value":1.0},{"axis":"completion","value":1.0},{"axis":"risk","value":0.0},{"axis":"confidence_proxy","value":1.0}],"concept":"test_suite"},"id":1,"session_id":"s_demo","source":"test_verified","verb":"assert"}
 ```
 
 Apply summaries:
@@ -201,15 +207,18 @@ Apply summaries:
 
 ### Files Changed
 
-- `src/ingest/mod.rs`
+- `src/beval/distill.rs`
+- `src/beval/ingest.rs`
 - `src/lib.rs`
 - `src/cli/commands.rs`
 - `tests/ingest_b04.rs`
+- `tests/fixtures/b04/*`
+- `docs/INGEST_AXIS_MAP.md`
 - `docs/BUILD_REPORT_NIGHT2.md`
 
 ### Deviations
 
-- Cargo-test, sweep, and world-run parsers intentionally emit compact verification summaries, not raw artifact text or test names. This preserves the Track B no-raw-text boundary.
+- Cargo-test, sweep, and world-run parsers intentionally emit compact verification summaries, not raw artifact text, individual test names, or world logs. This preserves the Track B no-raw-text boundary.
 - The sweep parser handles the project sweep CSV shape without adding a CSV dependency; quoted CSV fields are not supported because current sweep artifacts do not require them.
 
 ### Known Limitations
@@ -225,10 +234,10 @@ B05 static dashboard.
 ### Workstream
 
 - Added `src/dashboard/mod.rs`.
-- Added `am dashboard --snapshot <p> [--beval <results.json>...] --out <dash.html>`.
+- Added `am dashboard --snapshot <p> [--beval <results.json>...] [--trace <trace.jsonl>...] [--report <apply.json>...] --out <dash.html>`.
 - Dashboard output is a single self-contained HTML file with embedded JSON, inline CSS, and vanilla inline JS. It has no server, no network URLs, no external script/link tags, and no dependency on the quarantined prototype branch.
-- Snapshot panels cover summary metrics, active rows, strong links, open contradictions, and beval category summaries.
-- Added deterministic golden coverage and an embedded JSON smoke test.
+- Panels cover compiled context at budget 2000, active rows, strong links, open contradictions, staging queue with per-entry age and downloadable corroboration EG-1 template, B-eval results with token costs/category accuracy, and a provenance browser for the last 200 trace events joined with apply-report actions.
+- Added deterministic golden coverage, required-anchor greps, and an embedded JSON smoke test.
 
 ### Commands
 
@@ -248,15 +257,15 @@ $ cargo fmt && cargo clippy -- -D warnings && cargo test
 ### Demo
 
 ```text
-$ am dashboard --snapshot <dash.bin> --beval tests/golden/b05_beval.json --out tests/golden/b05_dashboard.html
-dashboard out=tests/golden/b05_dashboard.html bytes=6071
+$ am dashboard --snapshot <dash.bin> --beval tests/golden/b05_beval.json --trace <dash.bin.trace.jsonl> --report <report.json> --out tests/golden/b05_dashboard.html
+dashboard out=tests/golden/b05_dashboard.html bytes=9707
 ```
 
 ### Hashes
 
 ```text
 $ shasum -a 256 tests/golden/b05_dashboard.html tests/golden/b05_beval.json
-b52775e043722d53151b0ba0aa48b772cec74c70253b6b2a7bfd844532546d71  tests/golden/b05_dashboard.html
+2ffb3c3f5bfdbc3f863e25affe037d75e104d8b46a9c43f3ce3db3aef2d52eac  tests/golden/b05_dashboard.html
 c82201cd65da4303b368d50ce17b26c49f6acf162b6cc8f65a2146b62fb43e47  tests/golden/b05_beval.json
 ```
 
@@ -357,3 +366,37 @@ targets:
 ### Next
 
 Create final review artifacts and push.
+
+## Final Audit Gate
+
+### Commands
+
+```text
+$ cargo fmt && cargo clippy -- -D warnings && cargo test
+clippy: ok
+tests: 84 passed; 0 failed
+doc-tests: 0 passed; 0 failed
+```
+
+Focused reruns after the audit corrections:
+
+```text
+$ cargo test --test beval_b03 -- --nocapture
+test result: ok. 6 passed; 0 failed
+
+$ cargo test --test ingest_b04 -- --nocapture
+test result: ok. 5 passed; 0 failed
+
+$ cargo test --test dashboard_b05 -- --nocapture
+test result: ok. 2 passed; 0 failed
+```
+
+### Final Corrections
+
+- B03 `RECENT` now uses snapshot-resident mutation-cause history, not `recent_writes`; snapshot format is v5.
+- B04 ingest/distill now has committed fixtures, malformed-input tests, deterministic-output tests, and `docs/INGEST_AXIS_MAP.md`.
+- B05 dashboard now includes compiled context, staging queue with corroboration downloads, token-cost B-eval rows, and trace/report provenance joins.
+
+### Known Limitations
+
+- The Track B dashboard is still read-only inspection. It intentionally does not mutate snapshots or call a live LLM.

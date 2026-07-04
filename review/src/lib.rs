@@ -4,7 +4,6 @@ pub mod cli;
 pub mod core;
 pub mod dashboard;
 pub mod eval;
-pub mod ingest;
 pub mod llm;
 pub mod parser;
 pub mod percept;
