@@ -1,0 +1,1 @@
+ANSWER: B2 must beat B1 with at least 5x fewer context tokens, or the finding is diagnosis.

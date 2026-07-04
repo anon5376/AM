@@ -2,6 +2,7 @@ use crate::apply::{
     apply_parsed_batch, header_rejection_report, load_staging, parse_batch_text, save_staging,
     staging_path_for, trace_path_for, write_report, write_trace_file, ApplyReport,
 };
+use crate::beval::compile::{write_compiled_context, DEFAULT_CONTEXT_BUDGET};
 use crate::beval::{run_beval, BevalConfig, Lane, TransportKind};
 use crate::cli::render::{format_frame_with_glyphs, EpisodeGlyphs};
 use crate::cli::repl::run_repl;
@@ -96,6 +97,18 @@ enum Command {
         fixtures: PathBuf,
         #[arg(long)]
         record: bool,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        snapshot: Option<PathBuf>,
+        #[arg(long, default_value_t = DEFAULT_CONTEXT_BUDGET)]
+        context_budget: usize,
+    },
+    CompileContext {
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long, default_value_t = DEFAULT_CONTEXT_BUDGET)]
+        budget: usize,
         #[arg(long)]
         out: PathBuf,
     },
@@ -266,6 +279,8 @@ pub fn run() -> Result<()> {
             fixtures,
             record,
             out,
+            snapshot,
+            context_budget,
         } => {
             let config = BevalConfig {
                 corpus_dir: corpus,
@@ -274,6 +289,8 @@ pub fn run() -> Result<()> {
                 fixtures_dir: fixtures,
                 record,
                 out,
+                snapshot,
+                context_budget,
             };
             let results = run_beval(&config)?;
             println!(
@@ -283,6 +300,18 @@ pub fn run() -> Result<()> {
                 results.evaluated,
                 results.skipped,
                 config.out.display()
+            );
+        }
+        Command::CompileContext {
+            snapshot,
+            budget,
+            out,
+        } => {
+            let context = write_compiled_context(snapshot, budget, &out)?;
+            println!(
+                "compile-context out={} tokens={}",
+                out.display(),
+                crate::beval::prompt::token_count(&context)
             );
         }
         Command::Run {
