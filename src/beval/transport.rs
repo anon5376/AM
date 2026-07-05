@@ -99,7 +99,9 @@ pub fn write_recorded_fixture(fixtures_dir: &Path, hash: &str, response: &str) -
 
 #[cfg(test)]
 mod tests {
-    use super::{prompt_hash, prompt_preview};
+    use super::{prompt_hash, prompt_preview, FixtureManifest};
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn hash_is_stable() {
@@ -114,5 +116,17 @@ mod tests {
         let preview = prompt_preview(&format!("{}\n{}", "a".repeat(130), "tail"));
         assert_eq!(preview.len(), 120);
         assert!(!preview.contains('\n'));
+    }
+
+    #[test]
+    fn fixture_manifest_requires_explicit_synthetic_status() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("manifest.json"),
+            r#"{"version":"synthetic_v1","fixture_format":"sha256-prompt-v1"}"#,
+        )
+        .unwrap();
+        let err = FixtureManifest::load(dir.path()).unwrap_err();
+        assert!(err.to_string().contains("parse fixture manifest"));
     }
 }

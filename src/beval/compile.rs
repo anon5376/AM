@@ -1,7 +1,7 @@
 use crate::beval::prompt::token_count;
 use crate::core::axes::axis_name;
 use crate::core::inspect::axis_certainty;
-use crate::core::state::{AmState, ContradictionStatus};
+use crate::core::state::{AmState, ContradictionStatus, RECENT_MUTATION_CAUSE_CAPACITY};
 use crate::storage::snapshot_file::load_snapshot;
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
@@ -235,7 +235,12 @@ fn goal_entries(state: &AmState) -> Vec<String> {
 
 fn recent_entries(state: &AmState) -> Vec<String> {
     let mut counts = BTreeMap::<String, usize>::new();
-    for item in state.recent_mutation_causes.iter().rev().take(20) {
+    for item in state
+        .recent_mutation_causes
+        .iter()
+        .rev()
+        .take(RECENT_MUTATION_CAUSE_CAPACITY)
+    {
         *counts.entry(format!("{:?}", item.cause)).or_insert(0) += 1;
     }
     counts

@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const SNAPSHOT_FORMAT_VERSION: u32 = 5;
+pub const RECENT_MUTATION_CAUSE_CAPACITY: usize = 20;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Link {
@@ -469,7 +470,7 @@ impl AmState {
                 event_id: trace.event_id,
                 cause: mutation.cause,
             }));
-        let keep = 200;
+        let keep = RECENT_MUTATION_CAUSE_CAPACITY;
         if self.recent_mutation_causes.len() > keep {
             let drop_count = self.recent_mutation_causes.len() - keep;
             self.recent_mutation_causes.drain(0..drop_count);
